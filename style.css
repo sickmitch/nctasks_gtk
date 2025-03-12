@@ -1,0 +1,50 @@
+    /* Material Design styling */
+    window {
+        background-color: #1e1e1e; 
+        color: #dfe6ec;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    entry, spinbutton, button {
+        color: #dfe6ec;
+        border-radius: 4px;
+        border: 1px solid #2c9fb5;
+        padding: 5px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    entry{
+        font-weight: 600;
+    }
+
+    button {
+        padding: 8px 16px;
+        margin: 5px;
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+    }
+
+    button:hover {
+        background-color: #1e1e1e; 
+    }
+
+    treeview {
+        background-color: #1e1e1e; 
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    treeview:hover {
+        background-color: #1e1e1e; 
+    }
+
+    scrolledwindow {
+        background-color: #1e1e1e; 
+        border: 1px solid #2c9fb5;
+        border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    calendar {
+        background-color: #1e1e1e; /* Change this to your desired color */
+    }
