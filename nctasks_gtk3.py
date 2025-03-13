@@ -24,6 +24,8 @@ class NCTasksGTK(Gtk.Window):
         self.init_ui()
         # Start async data loading
         self.start_async_fetch()
+        # Initialize needed variables
+        self.new_task_due = None
 
     def load_environment_vars(self):
             """Load and validate required environment variables"""
@@ -274,7 +276,7 @@ class NCTasksGTK(Gtk.Window):
     def update_task_list(self):
         priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
         priority_sort_order = {'High': 3, 'Medium': 2, 'Low': 1, 'Not Set': 0}
-        status_map = {'IN-PROCESS': 'Started', 'NEEDS-ACTION': 'Todo'}
+        status_map = {'IN-PROCESS': 'Started', 'NEEDS-ACTION': 'Todo', 'COMPLETED': 'Completed'}
 
         self.task_list.clear()
         tasks = []
@@ -354,35 +356,98 @@ class NCTasksGTK(Gtk.Window):
 
     def on_add_clicked(self, widget):
         task = self.task_entry.get_text()
-        priority_text = self.priority_combo.get_active_text()  # Get the selected text from the combo box
-        status_text = self.status_combo.get_active_text()  # Get the selected text from the combo box
-    
+        priority_text = self.priority_combo.get_active_text()
+        status_text = self.status_combo.get_active_text()
+
         if not task:
             self.show_error("Task description cannot be empty!")
             return
 
-        # Map status 
         status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
-        status = status_map.get(status_text, "NEEDS-ACTION")  # Default to "Todo" if not found
+        status = status_map.get(status_text, "NEEDS-ACTION")
 
-        # Map the priority text to an integer value
         priority_map = {"Low": 9, "Medium": 5, "High": 1}
-        priority = priority_map.get(priority_text, 9)  # Default to "Low" if not found
+        priority = priority_map.get(priority_text, 9)
 
+        # Generate a unique UID for the task
+        uid = str(uuid.uuid4())
+
+        # Create a Todo component
         todo = Todo()
-        todo.add('uid', str(uuid.uuid4()))
+        todo.add('uid', uid)
         todo.add('summary', task)
-        # Convert string date to datetime.date object
+        if not self.new_task_due:
+            self.new_task_due = datetime.now().strftime('%Y-%m-%d')
         due_date = datetime.strptime(self.new_task_due, '%Y-%m-%d').date()
         todo.add('due', due_date)
         todo.add('status', status)
         todo.add('priority', priority)
         todo.add('dtstamp', datetime.now())
-        self.cal.add_component(todo)
-    
+
+        # Create a Calendar instance and add the Todo
+        cal = Calendar()
+        cal.add('prodid', '-//My Calendar App//')
+        cal.add('version', '2.0')
+        cal.add_component(todo)
+
+        # Generate the .ics data
+        ics_data = cal.to_ical()
+
+        # Determine the URL for the new task on the server
+        event_url = f"{self.cal_url}/{uid}.ics"
+
+        try:
+            # Push the .ics data to the server using PUT
+            response = requests.put(
+                url=event_url,
+                headers={
+                    'Content-Type': 'text/calendar; charset=utf-8',
+                },
+                auth=HTTPBasicAuth(self.user, self.api_key),
+                data=ics_data
+            )
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            self.show_error(f"Failed to add task to server: {e}")
+            return
+
+        # Clear the input field and update the task list
         self.task_entry.set_text('')
-        self.save_calendar()
         self.update_task_list()
+
+
+    # def on_add_clicked(self, widget):
+    #     task = self.task_entry.get_text()
+    #     priority_text = self.priority_combo.get_active_text()  # Get the selected text from the combo box
+    #     status_text = self.status_combo.get_active_text()  # Get the selected text from the combo box
+    
+    #     if not task:
+    #         self.show_error("Task description cannot be empty!")
+    #         return
+
+    #     # Map status 
+    #     status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
+    #     status = status_map.get(status_text, "NEEDS-ACTION")  # Default to "Todo" if not found
+
+    #     # Map the priority text to an integer value
+    #     priority_map = {"Low": 9, "Medium": 5, "High": 1}
+    #     priority = priority_map.get(priority_text, 9)  # Default to "Low" if not found
+
+    #     todo = Todo()
+    #     todo.add('uid', str(uuid.uuid4()))
+    #     todo.add('summary', task)
+    #     if not self.new_task_due:
+    #         self.new_task_due = datetime.now().strftime('%Y-%m-%d')
+    #     due_date = datetime.strptime(self.new_task_due, '%Y-%m-%d').date()
+    #     todo.add('due', due_date)
+    #     todo.add('status', status)
+    #     todo.add('priority', priority)
+    #     todo.add('dtstamp', datetime.now())
+    #     self.cal.add_component(todo)
+    
+    #     self.task_entry.set_text('')
+    #     self.save_calendar()
+    #     self.update_task_list()
 
     def on_remove_clicked(self, widget):
         selection = self.treeview.get_selection()
