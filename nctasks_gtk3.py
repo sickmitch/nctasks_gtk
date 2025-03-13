@@ -415,52 +415,36 @@ class NCTasksGTK(Gtk.Window):
         self.task_entry.set_text('')
         self.update_task_list()
 
-
-    # def on_add_clicked(self, widget):
-    #     task = self.task_entry.get_text()
-    #     priority_text = self.priority_combo.get_active_text()  # Get the selected text from the combo box
-    #     status_text = self.status_combo.get_active_text()  # Get the selected text from the combo box
-    
-    #     if not task:
-    #         self.show_error("Task description cannot be empty!")
-    #         return
-
-    #     # Map status 
-    #     status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
-    #     status = status_map.get(status_text, "NEEDS-ACTION")  # Default to "Todo" if not found
-
-    #     # Map the priority text to an integer value
-    #     priority_map = {"Low": 9, "Medium": 5, "High": 1}
-    #     priority = priority_map.get(priority_text, 9)  # Default to "Low" if not found
-
-    #     todo = Todo()
-    #     todo.add('uid', str(uuid.uuid4()))
-    #     todo.add('summary', task)
-    #     if not self.new_task_due:
-    #         self.new_task_due = datetime.now().strftime('%Y-%m-%d')
-    #     due_date = datetime.strptime(self.new_task_due, '%Y-%m-%d').date()
-    #     todo.add('due', due_date)
-    #     todo.add('status', status)
-    #     todo.add('priority', priority)
-    #     todo.add('dtstamp', datetime.now())
-    #     self.cal.add_component(todo)
-    
-    #     self.task_entry.set_text('')
-    #     self.save_calendar()
-    #     self.update_task_list()
-
     def on_remove_clicked(self, widget):
         selection = self.treeview.get_selection()
         model, treeiter = selection.get_selected()
-        
+
         if treeiter is not None:
-            uid_to_remove = model[treeiter][0]
-            for component in self.cal.subcomponents:
-                if component.name == 'VTODO' and str(component.get('uid')) == uid_to_remove:
-                    self.cal.subcomponents.remove(component)
-                    break
-            self.save_calendar()
-            self.update_task_list()
+            uid_to_remove = model[treeiter][0]  # Get the UID of the selected task
+
+            # Construct the URL for the task to delete
+            event_url = f"{self.cal_url}/{uid_to_remove}.ics"
+
+            try:
+                # Send a DELETE request to the server
+                response = requests.delete(
+                    url=event_url,
+                    auth=HTTPBasicAuth(self.user, self.api_key)
+                )
+                response.raise_for_status()  # Raise an exception for HTTP errors
+
+                # Remove the task from the local calendar
+                for component in self.cal.subcomponents:
+                    if component.name == 'VTODO' and str(component.get('uid')) == uid_to_remove:
+                        self.cal.subcomponents.remove(component)
+                        break
+
+                # Save the updated calendar and refresh the task list
+                self.save_calendar()
+                self.update_task_list()
+
+            except requests.exceptions.RequestException as e:
+                self.show_error(f"Failed to delete task from server: {e}")
 
     def on_clear_clicked(self, widget):
         dialog = Gtk.MessageDialog(
