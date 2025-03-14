@@ -8,6 +8,7 @@ To implement: <br />
    - [x] Various fields managing ( to check ) <br />
       - [ ] Remove due <br />
  - [ ] First use setup<br />
+   - [ ] Add calendar variable
  - [ ] Selected day highligh in calendar dialog<br />
  - [ ] Graphical refinement<br />
    - [ ] Toggle for excluding completed tasks
