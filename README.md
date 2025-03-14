@@ -1,9 +1,14 @@
 # NCTasks
-Visualization works fine <br />
-To implement still: <br />
- - [x] New Task <br /> 
+Visualization works fine. Ordering for due, priority and parent-son relation.<br />
+To implement: <br />
+ - [x] New Task <br />
  - [ ] Task management <br />
    - [x] Delete <br />
       - [x] Multiple selection
    - [x] Various fields managing ( to check ) <br />
-      - [ ] Remove due
+      - [ ] Remove due <br />
+ - [ ] First use setup<br />
+   - [ ] Add calendar variable
+ - [ ] Selected day highligh in calendar dialog<br />
+ - [ ] Graphical refinement<br />
+   - [ ] Toggle for excluding completed tasks
