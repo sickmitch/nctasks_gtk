@@ -10,3 +10,4 @@ To implement: <br />
  - [ ] First use setup<br />
  - [ ] Selected day highligh in calendar dialog<br />
  - [ ] Graphical refinement<br />
+   - [ ] Toggle for excluding completed tasks
