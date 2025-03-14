@@ -38,6 +38,10 @@
         background-color: #1e1e1e; 
     }
 
+    treeview:selected {
+        background-color: #2c9fb5;
+    }
+
     scrolledwindow {
         background-color: #1e1e1e; 
         border: 1px solid #2c9fb5;

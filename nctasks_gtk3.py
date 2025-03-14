@@ -3,7 +3,7 @@
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, Gdk
-from icalendar import Calendar, Todo
+from icalendar import Calendar, Todo, vDatetime
 from datetime import datetime, timezone, date
 import uuid
 import os
@@ -26,6 +26,30 @@ class NCTasksGTK(Gtk.Window):
         self.start_async_fetch()
         # Initialize needed variables
         self.new_task_due = None
+
+    def create_action_buttons(self):
+        """Create bottom action buttons"""
+        btn_box = Gtk.Box(spacing=5)
+        
+        self.sync_btn = Gtk.Button(label="Sync Now", image=Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON))
+        self.sync_btn.connect("clicked", self.on_sync_clicked)
+        
+        self.remove_btn = Gtk.Button(label="Remove Selected", image=Gtk.Image.new_from_icon_name("list-remove-symbolic", Gtk.IconSize.BUTTON))
+        self.remove_btn.connect("clicked", self.on_remove_clicked)
+        self.remove_btn.set_sensitive(False)
+        
+        self.edit_btn = Gtk.Button(label="Edit Task", image=Gtk.Image.new_from_icon_name("document-edit-symbolic", Gtk.IconSize.BUTTON))
+        self.edit_btn.connect("clicked", self.on_edit_clicked)
+        self.edit_btn.set_sensitive(False)
+        
+        self.clear_btn = Gtk.Button(label="Clear All", image=Gtk.Image.new_from_icon_name("edit-clear-all-symbolic", Gtk.IconSize.BUTTON))
+        self.clear_btn.connect("clicked", self.on_clear_clicked)
+        
+        btn_box.pack_start(self.sync_btn, False, False, 0)
+        btn_box.pack_start(self.remove_btn, False, False, 0)
+        btn_box.pack_start(self.edit_btn, False, False, 0)
+        btn_box.pack_start(self.clear_btn, False, False, 0)
+        self.grid.attach(btn_box, 0, 2, 5, 1)
 
     def load_environment_vars(self):
             """Load and validate required environment variables"""
@@ -127,46 +151,6 @@ class NCTasksGTK(Gtk.Window):
         
         self.grid.attach(input_box, 0, 0, 5, 1)
 
-    def create_task_list(self):
-        """Create task list display"""
-        self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
-        self.task_list = Gtk.ListStore(str, str, str, str, str)  # UID, Task, Priority, Status, Due
-        self.treeview = Gtk.TreeView(model=self.task_list)
-        
-        # Configure columns
-        columns = [
-            ("Task", 1),
-            ("Priority", 2),
-            ("Status", 3),
-            ("Due", 4)
-        ]
-        
-        for i, (title, col_id) in enumerate(columns):
-            renderer = Gtk.CellRendererText()
-            column = Gtk.TreeViewColumn(title, renderer, text=col_id)
-            self.treeview.append_column(column)
-        
-        self.scrolled_window.add(self.treeview)
-        self.grid.attach(self.scrolled_window, 0, 1, 5, 1)
-
-    def create_action_buttons(self):
-        """Create bottom action buttons"""
-        btn_box = Gtk.Box(spacing=5)
-        
-        self.sync_btn = Gtk.Button(label="Sync Now", image=Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON))
-        self.sync_btn.connect("clicked", self.on_sync_clicked)
-        
-        self.remove_btn = Gtk.Button(label="Remove Selected", image=Gtk.Image.new_from_icon_name("list-remove-symbolic", Gtk.IconSize.BUTTON))
-        self.remove_btn.connect("clicked", self.on_remove_clicked)
-        
-        self.clear_btn = Gtk.Button(label="Clear All", image=Gtk.Image.new_from_icon_name("edit-clear-all-symbolic", Gtk.IconSize.BUTTON))
-        self.clear_btn.connect("clicked", self.on_clear_clicked)
-        
-        btn_box.pack_start(self.sync_btn, False, False, 0)
-        btn_box.pack_start(self.remove_btn, False, False, 0)
-        btn_box.pack_start(self.clear_btn, False, False, 0)
-        self.grid.attach(btn_box, 0, 2, 5, 1)
-
     def start_async_fetch(self):
         """Start background data synchronization"""
         self.set_ui_state(busy=True, status="Connecting to Nextcloud...")
@@ -206,6 +190,206 @@ class NCTasksGTK(Gtk.Window):
         finally:
             GLib.idle_add(self.set_ui_state, False, ("Synced at " + datetime.now().strftime("%H:%M")))
 
+    def create_task_list(self):
+        """Create task list display"""
+        self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
+        self.task_list = Gtk.ListStore(str, str, str, str, str)  # UID, Task, Priority, Status, Due
+        self.treeview = Gtk.TreeView(model=self.task_list)
+
+        # Enable multiple selection
+        selection = self.treeview.get_selection()
+        selection.set_mode(Gtk.SelectionMode.MULTIPLE)
+
+        # Configure columns
+        columns = [
+            ("Task", 1),
+            ("Priority", 2),
+            ("Status", 3),
+            ("Due", 4)
+        ]
+
+        for i, (title, col_id) in enumerate(columns):
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(title, renderer, text=col_id)
+            self.treeview.append_column(column)
+
+        self.scrolled_window.add(self.treeview)
+        self.grid.attach(self.scrolled_window, 0, 1, 5, 1)
+        # Enable multiple selection and connect signal
+        selection = self.treeview.get_selection()
+        selection.set_mode(Gtk.SelectionMode.MULTIPLE)
+        selection.connect("changed", self.on_selection_changed)
+
+    def on_selection_changed(self, selection):
+        """Handle task selection changes to update button states"""
+        model, paths = selection.get_selected_rows()
+        num_selected = len(paths)
+        self.edit_btn.set_sensitive(num_selected == 1)
+        self.remove_btn.set_sensitive(num_selected >= 1)
+
+    def on_edit_clicked(self, widget):
+        """Handle edit button click"""
+        selection = self.treeview.get_selection()
+        model, paths = selection.get_selected_rows()
+        if len(paths) != 1:
+            return
+
+        treeiter = model.get_iter(paths[0])
+        uid = model[treeiter][0]
+
+        # Find the VTODO component
+        todo = None
+        for component in self.cal.walk():
+            if component.name == 'VTODO' and str(component.get('uid')) == uid:
+                todo = component
+                break
+        if not todo:
+            self.show_error("Task not found!")
+            return
+
+        # Get current values
+        current_summary = str(todo.get('summary', ''))
+        current_status = str(todo.get('status', 'NEEDS-ACTION'))
+        current_priority = int(todo.get('priority', 9))
+        current_due = todo.get('due')
+
+        # Map status to UI labels
+        status_map = {'NEEDS-ACTION': 'Todo', 'IN-PROCESS': 'Started', 'COMPLETED': 'Completed'}
+        current_status_label = status_map.get(current_status, 'Todo')
+
+        # Map priority to UI labels
+        priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
+        current_priority_label = priority_map.get(current_priority, 'Low')
+
+        # Parse due date
+        current_due_date = None
+        if current_due:
+            due_dt = current_due.dt
+            if isinstance(due_dt, datetime):
+                current_due_date = due_dt.date()
+            elif isinstance(due_dt, date):
+                current_due_date = due_dt
+
+        # Create edit dialog
+        dialog = Gtk.Dialog(title="Edit Task", parent=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("OK", Gtk.ResponseType.OK)
+        content_area = dialog.get_content_area()
+        grid = Gtk.Grid(column_spacing=10, row_spacing=10, margin=10)
+        content_area.add(grid)
+
+        # Summary field
+        summary_label = Gtk.Label(label="Summary:")
+        summary_entry = Gtk.Entry()
+        summary_entry.set_text(current_summary)
+        grid.attach(summary_label, 0, 0, 1, 1)
+        grid.attach(summary_entry, 1, 0, 1, 1)
+
+        # Status combo
+        status_label = Gtk.Label(label="Status:")
+        status_combo = Gtk.ComboBoxText()
+        for status in ["Todo", "Started", "Completed"]:
+            status_combo.append_text(status)
+        status_combo.set_active(["Todo", "Started", "Completed"].index(current_status_label))
+        grid.attach(status_label, 0, 1, 1, 1)
+        grid.attach(status_combo, 1, 1, 1, 1)
+
+        # Priority combo
+        priority_label = Gtk.Label(label="Priority:")
+        priority_combo = Gtk.ComboBoxText()
+        for priority in ["Low", "Medium", "High"]:
+            priority_combo.append_text(priority)
+        priority_combo.set_active(["Low", "Medium", "High"].index(current_priority_label))
+        grid.attach(priority_label, 0, 2, 1, 1)
+        grid.attach(priority_combo, 1, 2, 1, 1)
+
+        # Due date picker
+        due_label = Gtk.Label(label="Due Date:")
+        due_button = Gtk.Button()
+        if current_due_date:
+            due_button.set_label(current_due_date.strftime('%Y-%m-%d'))
+        else:
+            due_button.set_label("Select Date")
+        due_button.connect("clicked", self.on_edit_due_date_clicked, due_button)
+        grid.attach(due_label, 0, 3, 1, 1)
+        grid.attach(due_button, 1, 3, 1, 1)
+
+        dialog.show_all()
+        response = dialog.run()
+
+        if response == Gtk.ResponseType.OK:
+            # Update task details
+            new_summary = summary_entry.get_text()
+            new_status_label = status_combo.get_active_text()
+            new_priority_label = priority_combo.get_active_text()
+            new_due_str = due_button.get_label()
+
+            # Map back to iCalendar values
+            status_reverse_map = {v: k for k, v in status_map.items()}
+            new_status = status_reverse_map.get(new_status_label, 'NEEDS-ACTION')
+            priority_reverse_map = {'Low': 9, 'Medium': 5, 'High': 1}
+            new_priority = priority_reverse_map.get(new_priority_label, 9)
+            new_due = None
+            if new_due_str != "Select Date":
+                try:
+                    new_due_date = datetime.strptime(new_due_str, '%Y-%m-%d').date()
+                    # Convert date to datetime with timezone
+                    new_due_datetime = datetime.combine(new_due_date, datetime.min.time(), timezone.utc)
+                    # Convert the datetime to the correct iCalendar format
+                    new_due = vDatetime(new_due_datetime).to_ical().decode('utf-8')
+                except Exception as e:
+                    print(f"Error parsing date: {e}")
+                    new_due = None
+
+            # Update the VTODO component
+            todo['summary'] = new_summary
+            todo['status'] = new_status
+            todo['priority'] = new_priority
+            if new_due:
+                todo['due'] = new_due
+            elif 'due' in todo:
+                del todo['due']
+
+
+            # Prepare and send PUT request
+            cal = Calendar()
+            cal.add('prodid', '-//NCTasks//')
+            cal.add('version', '2.0')
+            cal.add_component(todo)
+            ics_data = cal.to_ical()
+
+            event_url = f"{self.cal_url}/{uid}.ics"
+            try:
+                response = requests.put(
+                    event_url,
+                    headers={
+                        'Content-Type': 'text/calendar; charset=utf-8'
+                    },
+                    auth=HTTPBasicAuth(self.user, self.api_key),
+                    data=ics_data
+                )
+                response.raise_for_status()
+                self.start_async_fetch()  # Refresh the task list
+            except Exception as e:
+                self.show_error(f"Failed to update task: {e}")
+
+        dialog.destroy()
+
+    def on_edit_due_date_clicked(self, widget, due_button):
+        """Handle due date selection in edit dialog"""
+        dialog = Gtk.Dialog(title="Select Due Date", parent=self, modal=True)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("OK", Gtk.ResponseType.OK)
+        calendar = Gtk.Calendar()
+        content_area = dialog.get_content_area()
+        content_area.add(calendar)
+        dialog.show_all()
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            year, month, day = calendar.get_date()
+            due_str = f"{year}-{month+1:02d}-{day:02d}"
+            due_button.set_label(due_str)
+        dialog.destroy()
     def update_calendar_data(self):
         """Load and display calendar data"""
         self.cal = self.load_or_create_calendar()
@@ -413,17 +597,26 @@ class NCTasksGTK(Gtk.Window):
 
         # Clear the input field and update the task list
         self.task_entry.set_text('')
+        self.fetch_caldav_data()
         self.update_task_list()
 
     def on_remove_clicked(self, widget):
         selection = self.treeview.get_selection()
-        model, treeiter = selection.get_selected()
+        model, paths = selection.get_selected_rows()
 
-        if treeiter is not None:
+        if not paths:
+            return  # No rows selected
+
+        # Collect all UIDs to remove
+        uids_to_remove = []
+        for path in paths:
+            treeiter = model.get_iter(path)
             uid_to_remove = model[treeiter][0]  # Get the UID of the selected task
+            uids_to_remove.append(uid_to_remove)
 
-            # Construct the URL for the task to delete
-            event_url = f"{self.cal_url}/{uid_to_remove}.ics"
+        # Construct the URLs for the tasks to delete
+        for uid in uids_to_remove:
+            event_url = f"{self.cal_url}/{uid}.ics"
 
             try:
                 # Send a DELETE request to the server
@@ -435,16 +628,16 @@ class NCTasksGTK(Gtk.Window):
 
                 # Remove the task from the local calendar
                 for component in self.cal.subcomponents:
-                    if component.name == 'VTODO' and str(component.get('uid')) == uid_to_remove:
+                    if component.name == 'VTODO' and str(component.get('uid')) == uid:
                         self.cal.subcomponents.remove(component)
                         break
 
-                # Save the updated calendar and refresh the task list
-                self.save_calendar()
-                self.update_task_list()
-
             except requests.exceptions.RequestException as e:
                 self.show_error(f"Failed to delete task from server: {e}")
+
+        # Save the updated calendar and refresh the task list
+        self.save_calendar()
+        self.update_task_list()
 
     def on_clear_clicked(self, widget):
         dialog = Gtk.MessageDialog(
