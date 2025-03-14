@@ -93,23 +93,30 @@ class NCTasksGTK(Gtk.Window):
         """Initialize all UI components"""
         # CSS setup
         self.init_styling()
-        
+
         # Main layout
         self.grid = Gtk.Grid(column_spacing=5, row_spacing=5)
         self.add(self.grid)
-        
+
         # Status components
         self.status_bar = Gtk.Statusbar()
         self.spinner = Gtk.Spinner()
-        
+
+        # Container for spinner + status bar
+        self.status_container = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, 
+            spacing=5
+        )
+        self.status_container.pack_start(self.spinner, False, False, 0)
+        self.status_container.pack_start(self.status_bar, True, True, 0)  # Statusbar expands
+
         # Task input components
         self.create_input_fields()
         self.create_task_list()
         self.create_action_buttons()
-        
-        # Assemble UI
-        self.grid.attach(self.status_bar, 0, 3, 5, 1)
-        self.grid.attach_next_to(self.spinner, self.status_bar, Gtk.PositionType.LEFT, 1, 1)
+
+        # Assemble UI - status_container occupies the original grid space
+        self.grid.attach(self.status_container, 0, 3, 5, 1)  # Span 5 columns
 
     def init_styling(self):
         """Initialize CSS styling"""
@@ -272,6 +279,7 @@ class NCTasksGTK(Gtk.Window):
 
         # Create edit dialog
         dialog = Gtk.Dialog(title="Edit Task", parent=self, modal=True)
+        dialog.set_default_size(400, -1)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
         dialog.add_button("OK", Gtk.ResponseType.OK)
         content_area = dialog.get_content_area()
@@ -350,7 +358,6 @@ class NCTasksGTK(Gtk.Window):
             elif 'due' in todo:
                 del todo['due']
 
-
             # Prepare and send PUT request
             cal = Calendar()
             cal.add('prodid', '-//NCTasks//')
@@ -378,6 +385,7 @@ class NCTasksGTK(Gtk.Window):
     def on_edit_due_date_clicked(self, widget, due_button):
         """Handle due date selection in edit dialog"""
         dialog = Gtk.Dialog(title="Select Due Date", parent=self, modal=True)
+        dialog.set_default_size(400, 200)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
         dialog.add_button("OK", Gtk.ResponseType.OK)
         calendar = Gtk.Calendar()
@@ -390,6 +398,7 @@ class NCTasksGTK(Gtk.Window):
             due_str = f"{year}-{month+1:02d}-{day:02d}"
             due_button.set_label(due_str)
         dialog.destroy()
+
     def update_calendar_data(self):
         """Load and display calendar data"""
         self.cal = self.load_or_create_calendar()
@@ -409,8 +418,6 @@ class NCTasksGTK(Gtk.Window):
             
         if status:
             self.status_bar.push(0, status)
-
-        # Initial task list update
 
     def load_or_create_calendar(self):
         cal = Calendar()
@@ -600,6 +607,31 @@ class NCTasksGTK(Gtk.Window):
         self.fetch_caldav_data()
         self.update_task_list()
 
+    def on_calendar_icon_clicked(self, widget):
+            dialog = Gtk.Dialog(
+                title="Select Due Date",
+                parent=self,
+                modal=True,
+                destroy_with_parent=True
+            )
+            dialog.set_default_size(400, 200)
+            # Create content area
+            content_area = dialog.get_content_area()
+            # Create calendar widget
+            calendar = Gtk.Calendar()
+            content_area.add(calendar)
+            # Add buttons
+            dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+            dialog.add_button("OK", Gtk.ResponseType.OK)
+            # Show all widgets in the dialog
+            dialog.show_all()
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                year, month, day = calendar.get_date()
+                self.new_task_due = f"{year}-{month + 1:02d}-{day:02d}"
+            print(self.new_task_due)
+            dialog.destroy()
+
     def on_remove_clicked(self, widget):
         selection = self.treeview.get_selection()
         model, paths = selection.get_selected_rows()
@@ -655,31 +687,7 @@ class NCTasksGTK(Gtk.Window):
             self.save_calendar()
             self.update_task_list()
 
-    def on_calendar_icon_clicked(self, widget):
-        dialog = Gtk.Dialog(
-            title="Select Due Date",
-            parent=self,
-            modal=True,
-            destroy_with_parent=True
-        )
-        dialog.set_default_size(400, 200)
-        # Create content area
-        content_area = dialog.get_content_area()
-        # Create calendar widget
-        calendar = Gtk.Calendar()
-        content_area.add(calendar)
-        # Add buttons
-        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
-        dialog.add_button("OK", Gtk.ResponseType.OK)
-        # Show all widgets in the dialog
-        dialog.show_all()
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            year, month, day = calendar.get_date()
-            self.new_task_due = f"{year}-{month + 1:02d}-{day:02d}"
-        print(self.new_task_due)
-
-        dialog.destroy()
+    
 
     def show_error(self, message):
         dialog = Gtk.MessageDialog(
