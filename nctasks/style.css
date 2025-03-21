@@ -1,0 +1,56 @@
+    /* Material Design styling */
+    window {
+        background-color: #1e1e1e; 
+        color: #dfe6ec;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    entry {
+        color: #dfe6ec;
+        min-height: 30px;  /* Direct height control */
+        padding: 0 5px;     /* Horizontal padding only */
+        margin: 5px;          /* Remove external spacing */
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    button {
+        color: #dfe6ec;
+        min-height: 30px;   /* Match entry height */
+        padding: 5px;       /* Uniform padding */
+        margin: 5px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    entry{
+        font-weight: 600;
+    }
+
+    button:hover {
+        background-color: #0b2e42; 
+    }
+
+    treeview {
+        background-color: #1e1e1e; 
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    treeview:hover {
+        background-color: #1e1e1e; 
+    }
+
+    treeview:selected {
+        background-color: #2c9fb5;
+    }
+
+    scrolledwindow {
+        background-color: #1e1e1e; 
+        border: 2px solid #2c9fb5;
+        font-weight: 350;
+        border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    calendar {
+        background-color: #1e1e1e; /* Change this to your desired color */
+    }
