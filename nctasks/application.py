@@ -255,6 +255,7 @@ class Application(Gtk.Application):
 
             self.base_url = os.getenv("BASE_URL")
             self.user = os.getenv("USERNAME")
+            self.calendar = os.getenv("CALENDAR")
             self.api_key = os.getenv("API_KEY")
             self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_gtk"))
 
@@ -270,7 +271,7 @@ class Application(Gtk.Application):
                     f"Create a .env file with these values or set them system-wide."
                 )
 
-            self.cal_url = f"{self.base_url}/remote.php/dav/calendars/{self.user}/attivit"
+            self.cal_url = f"{self.base_url}/remote.php/dav/calendars/{self.user}/{self.calendar}"
             self.ics_file = os.path.join(self.root_dir, 'tasks')
 
     def start_async_fetch(self):

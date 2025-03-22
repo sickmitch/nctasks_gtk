@@ -40,7 +40,9 @@
     }
 
     treeview:selected {
+        border-radius: 0px;
         background-color: #2c9fb5;
+        color: black;
     }
 
     scrolledwindow {

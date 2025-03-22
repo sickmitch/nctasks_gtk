@@ -12,7 +12,6 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     dialog = Gtk.Dialog(title="Edit Task")
     dialog.set_transient_for(parent)
     dialog.set_modal(True)
-    dialog.set_default_size(400, -1)
     dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
     dialog.add_button("OK", Gtk.ResponseType.OK)
 
@@ -28,8 +27,10 @@ def create_edit_dialog(parent, current_summary, current_status_label,
 
     # Summary field
     summary_label = Gtk.Label(label="Summary:")
-    summary_entry = Gtk.Entry()
+    summary_entry = Gtk.Entry(xalign=0.5)
     summary_entry.set_text(current_summary)
+    summary_entry.set_size_request(250, -1)
+
     grid.attach(summary_label, 0, 0, 1, 1)
     grid.attach(summary_entry, 1, 0, 1, 1)
 
@@ -39,6 +40,8 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     for status in ["Todo", "Started", "Completed"]:
         status_combo.append_text(status)
     status_combo.set_active(["Todo", "Started", "Completed"].index(current_status_label))
+    status_renderer = status_combo.get_cells()[0]
+    status_renderer.set_property("xalign", 0.5)
     grid.attach(status_label, 0, 1, 1, 1)
     grid.attach(status_combo, 1, 1, 1, 1)
 
@@ -48,6 +51,8 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     for priority in ["Low", "Medium", "High"]:
         priority_combo.append_text(priority)
     priority_combo.set_active(["Low", "Medium", "High"].index(current_priority_label))
+    priority_renderer = priority_combo.get_cells()[0]
+    priority_renderer.set_property("xalign", 0.5)
     grid.attach(priority_label, 0, 2, 1, 1)
     grid.attach(priority_combo, 1, 2, 1, 1)
 

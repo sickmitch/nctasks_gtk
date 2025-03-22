@@ -7,6 +7,7 @@ class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("NCTasks")
+        self.set_size_request(625, 500)  
         self.app = app
         self.grid = Gtk.Grid(
             column_spacing=5,
@@ -30,8 +31,9 @@ class Window(Gtk.ApplicationWindow):
         self.grid.attach(input_box, 0, 0, 5, 1)
         self.task_entry = Gtk.Entry(
             placeholder_text="Task description",
-            hexpand=True,  # Use built-in property
-            halign=Gtk.Align.FILL
+            hexpand=True,
+            halign=Gtk.Align.FILL,
+            xalign=0.5  
         )
         input_box.append(self.task_entry)
         
@@ -40,6 +42,8 @@ class Window(Gtk.ApplicationWindow):
         for status in ["Todo", "Started"]:
             self.status_combo.append_text(status)
         self.status_combo.set_active(0)
+        status_renderer = self.status_combo.get_cells()[0]
+        status_renderer.set_property("xalign", 0.5)
         input_box.append(self.status_combo)
 
         #PRIO
@@ -47,6 +51,8 @@ class Window(Gtk.ApplicationWindow):
         for priority in ["Low", "Medium", "High"]:
             self.priority_combo.append_text(priority)
         self.priority_combo.set_active(0)
+        priority_renderer = self.priority_combo.get_cells()[0]
+        priority_renderer.set_property("xalign", 0.5)
         input_box.append(self.priority_combo)
 
         # DUE
@@ -152,11 +158,6 @@ class Window(Gtk.ApplicationWindow):
         self.edit_btn.set_sensitive(num_selected == 1)
         self.delete_btn.set_sensitive(num_selected >= 1)
 
-    # def calendar_dialog(self, widget):
-    #         from .dialogs import on_due_date_clicked
-    #         on_due_date_clicked(widget, self.calendar_icon)
-    #         print ()
-
     def init_styling(self):
         self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_split"))
         css_provider = Gtk.CssProvider()
@@ -172,17 +173,6 @@ class Window(Gtk.ApplicationWindow):
         except Exception as e:
             print(f"Error loading CSS: {e}")
     
-# class TaskItem(GObject.Object):
-#     __gtype_name__ = 'TaskItem'
-    
-#     def __init__(self, uid, task, priority, status, due):
-#         super().__init__()
-#         self.uid = uid
-#         self.task = task
-#         self.priority = priority
-#         self.status = status
-#         self.due = due
-
 
 class MyApp(Gtk.Application):
 
