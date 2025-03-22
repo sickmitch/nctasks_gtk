@@ -29,20 +29,10 @@
         background-color: #0b2e42; 
     }
 
-    treeview {
-        background-color: #1e1e1e; 
+    list {
+        background-color: #18171d; 
         border-radius: 4px;
         font-family: 'JetBrains Mono', monospace;
-    }
-
-    treeview:hover {
-        background-color: #1e1e1e; 
-    }
-
-    treeview:selected {
-        border-radius: 0px;
-        background-color: #2c9fb5;
-        color: black;
     }
 
     scrolledwindow {

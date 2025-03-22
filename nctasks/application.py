@@ -35,7 +35,7 @@ class Application(Gtk.Application):
             new_task_due = self.window.due_button.selected_date
         else:
             new_task_due = "None"
-
+        
         if not task:
             error_dialog("! Tasks needs a summary !")
             return
@@ -94,19 +94,9 @@ class Application(Gtk.Application):
         self.start_async_fetch()
 
     def on_del_clicked(self, button):
-        selection = self.window.treeview.get_selection()
-        model, paths = selection.get_selected_rows()
-
-        if not paths:
-            return  # No rows selected
-
-        # Collect all UIDs to remove
-        uids_to_remove = []
-        for path in paths:
-            treeiter = model.get_iter(path)
-            uid_to_remove = model[treeiter][0]  # Get the UID of the selected task
-            uids_to_remove.append(uid_to_remove)
-
+        selected_rows = self.window.listbox.get_selected_rows()
+        uids_to_remove = [row.uid for row in selected_rows] 
+        
         # Construct the URLs for the tasks to delete
         for uid in uids_to_remove:
             event_url = f"{self.cal_url}/{uid}.ics"
@@ -133,21 +123,12 @@ class Application(Gtk.Application):
         # Save the updated calendar and refresh the task list
         self.start_async_fetch()
 
-    def on_edit_clicked(self, button):  ###### DA SISTEMARE
-        # Get selected rows from TreeView's selection
-        selection = self.window.treeview.get_selection()
-        model, paths = selection.get_selected_rows()
-
-        # Check number of selected items
-        num_selected = len(paths)
-        if num_selected != 1:  # Require exactly one selection for editing
+    def on_edit_clicked(self, button):
+        selected_rows = self.window.listbox.get_selected_rows()
+        if len(selected_rows) != 1:
             return
+        uid = str([row.uid for row in selected_rows]).strip("[]'")
 
-        # Get UID from the first (and only) selected row
-        treeiter = model.get_iter(paths[0])
-        uid = model[treeiter][0]
-
-        # Find the VTODO component (rest of your code remains unchanged)
         todo = None
         for component in self.cal.walk():
             if component.name == 'VTODO' and str(component.get('uid')) == uid:
@@ -196,7 +177,6 @@ class Application(Gtk.Application):
 
     def handle_edit_response(summary_entry, status_combo, priority_combo, due_button,
                             todo, cal_url, user, api_key, refresh_callback):
-        
         # define new Todo values
         new_summary = summary_entry.get_text()
         status_idx = status_combo.get_active()
@@ -225,11 +205,13 @@ class Application(Gtk.Application):
         todo['summary'] = new_summary
         todo['status'] = new_status
         todo['priority'] = new_priority
-        if new_due_str != "Not Set":                         #### ugly but works
+        todo['due'] = "Not Set"          #### ugly but works
+        if new_due_str != "Not Set":                         
             del todo['due']
             todo.add('due', new_due_str)
         elif 'due' in todo:
             del todo['due']
+
 
         # Prepare and send PUT request
         cal = Calendar()
@@ -327,10 +309,8 @@ class Application(Gtk.Application):
             self.window.status_bar.push(0, "Synchronized at "+ datetime.now().strftime("%H:%M:%S"))
 
     def update_calendar_data(self):
-        """Load and display calendar data"""
         self.cal = self.load_or_create_calendar()
         self.update_task_list()
-        # self.status_bar.push(0, "Synchronized: " + datetime.now().strftime("%H:%M:%S"))
 
     def load_or_create_calendar(self):
         cal = Calendar()
@@ -377,12 +357,82 @@ class Application(Gtk.Application):
             print(f"Error loading calendar data: {e}")
             return cal
 
+    # def update_task_list(self):
+    #     priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
+    #     priority_sort_order = {'High': 3, 'Medium': 2, 'Low': 1, 'Not Set': 0}
+    #     status_map = {'IN-PROCESS': 'Started', 'NEEDS-ACTION': 'Todo', 'COMPLETED': 'Completed'}
+
+    #     self.task_list.clear()
+    #     tasks = []
+    #     parent_to_children = {}
+
+    #     # First pass: collect all tasks and build parent-child relationships
+    #     for component in self.cal.walk():
+    #         if component.name == 'VTODO':
+    #             try:
+    #                 uid = str(component.get('uid', ''))
+    #                 task = str(component.get('summary', 'Untitled Task'))
+
+    #                 # Map priority to descriptive label
+    #                 priority_val = int(component.get('priority', '9999'))  # Default to "Not Set"
+    #                 priority = priority_map.get(priority_val, 'Not Set')
+
+    #                 # Map status to descriptive label
+    #                 status_val = str(component.get('status', 'None'))
+    #                 status = status_map.get(status_val, 'None')
+
+    #                 # Parse the due field
+    #                 due = component.get('due')
+    #                 if due:
+    #                     if isinstance(due, str):
+    #                         # Handle string due dates
+    #                         if 'T' in due:
+    #                             # Datetime format: DUE:20250318T235959
+    #                             due_date = datetime.strptime(due, '%Y%m%dT%H%M%S')
+    #                         else:
+    #                             # Date format: DUE;VALUE=DATE:20250316
+    #                             due_date = datetime.strptime(due, '%Y%m%d')
+    #                     else:
+    #                         # Handle datetime and date objects
+    #                         due_date = due.dt
+    #                         if isinstance(due_date, date) and not isinstance(due_date, datetime):
+    #                             due_date = datetime.combine(due_date, datetime.min.time(), timezone.utc)
+    #                         elif due_date.tzinfo is None:  # Convert naive datetime to UTC
+    #                             due_date = due_date.replace(tzinfo=timezone.utc)
+    #                     due_str = due_date.strftime('󰥔   %a %d/%m H:%H')
+    #                 else:
+    #                     due_date = datetime.max.replace(tzinfo=timezone.utc)  # Make datetime max timezone-aware
+    #                     due_str = 'Not Set'
+
+    #                 # Check for RELATED-TO field
+    #                 related_to = str(component.get('related-to', ''))
+    #                 if related_to:
+    #                     if related_to not in parent_to_children:
+    #                         parent_to_children[related_to] = []
+    #                     parent_to_children[related_to].append((uid, task, priority, status, due_str, due_date))
+    #                 else:
+    #                     tasks.append((uid, task, priority, status, due_str, due_date))
+
+    #             except Exception as e:
+    #                 print(f"Error parsing task: {e}")
+
+    #     # Sort tasks: first by due date (ascending), then by priority (descending)
+    #     tasks.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
+
+    #     # Populate self.task_list with sorted tasks, ensuring children follow their parents
+    #     for uid, task, priority, status, due_str, _ in tasks:
+    #         self.task_list.append([uid, task, priority, status, due_str])
+    #         if uid in parent_to_children:
+    #             children = parent_to_children[uid]
+    #             children.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
+    #             for child_uid, child_task, child_priority, child_status, child_due_str, _ in children:
+    #                 self.task_list.append([child_uid, f" 󰳟   {child_task}", child_priority, child_status, child_due_str])
+
     def update_task_list(self):
         priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
         priority_sort_order = {'High': 3, 'Medium': 2, 'Low': 1, 'Not Set': 0}
         status_map = {'IN-PROCESS': 'Started', 'NEEDS-ACTION': 'Todo', 'COMPLETED': 'Completed'}
 
-        self.task_list.clear()
         tasks = []
         parent_to_children = {}
 
@@ -439,11 +489,28 @@ class Application(Gtk.Application):
         # Sort tasks: first by due date (ascending), then by priority (descending)
         tasks.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
 
-        # Populate self.task_list with sorted tasks, ensuring children follow their parents
+
+        processed_tasks = []
         for uid, task, priority, status, due_str, _ in tasks:
-            self.task_list.append([uid, task, priority, status, due_str])
+            # Add parent task
+            processed_tasks.append((uid, task, priority, status, due_str))
+
+            # Add children if they exist
             if uid in parent_to_children:
                 children = parent_to_children[uid]
                 children.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
                 for child_uid, child_task, child_priority, child_status, child_due_str, _ in children:
-                    self.task_list.append([child_uid, f" 󰳟   {child_task}", child_priority, child_status, child_due_str])
+                    # Add indentation for child tasks
+                    processed_tasks.append((
+                        child_uid,
+                        f"󰳟   {child_task}",  # Unicode character + indentation
+                        child_priority,
+                        child_status,
+                        child_due_str
+                    ))
+
+                    
+        # Update the application's task list
+        self.task_list = processed_tasks
+        if hasattr(self, 'window') and self.window:
+            GLib.idle_add(self.window.populate_listbox)

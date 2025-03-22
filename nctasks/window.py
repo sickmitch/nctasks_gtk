@@ -79,29 +79,51 @@ class Window(Gtk.ApplicationWindow):
 
     def create_task_list(self):
         self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
-        self.app.task_list = Gtk.ListStore(str, str, str, str, str)  # UID, Task, Priority, Status, Due
-        self.treeview = Gtk.TreeView(model=self.app.task_list)
-
-        # Enable multiple selection
-        selection = self.treeview.get_selection()
-        selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-        selection.connect("changed", self.on_selection_changed)
-
-        # Configure columns
-        columns = [
-            ("Task", 1),
-            ("Priority", 2),
-            ("Status", 3),
-            ("Due", 4)
-        ]
-
-        for i, (title, col_id) in enumerate(columns):
-            renderer = Gtk.CellRendererText()
-            column = Gtk.TreeViewColumn(title, renderer, text=col_id)
-            self.treeview.append_column(column)
-
-        self.scrolled_window.set_child(self.treeview)
+        self.listbox = Gtk.ListBox()
+        self.listbox.set_selection_mode(Gtk.SelectionMode.MULTIPLE)
+        self.listbox.connect("selected-rows-changed", self.on_selection_changed)
+        self.scrolled_window.set_child(self.listbox)
         self.grid.attach(self.scrolled_window, 0, 1, 5, 1)
+        
+    def populate_listbox(self):
+        while True:
+            row = self.listbox.get_row_at_index(0)
+            if row is None:
+                break
+            self.listbox.remove(row)
+
+        for task in self.app.task_list:
+            uid, summary, priority, status, due = task
+            row = Gtk.ListBoxRow()
+            row.uid = uid
+
+            grid = Gtk.Grid(column_spacing=10, margin_start=5, margin_end=5)
+
+            labels = [
+                Gtk.Label(label=summary, xalign=0),
+                Gtk.Label(label=priority, xalign=0.5),
+                Gtk.Label(label=status, xalign=0.5),
+                Gtk.Label(label=due, xalign=1)
+            ]
+
+            # Apply alignment and expansion
+            alignments = [Gtk.Align.START, Gtk.Align.CENTER, Gtk.Align.CENTER, Gtk.Align.END]
+
+            for i, (label, align) in enumerate(zip(labels, alignments)):
+                label.set_halign(align)
+                label.set_hexpand(True)
+                grid.attach(label, i, 0, 1, 1)
+
+            row.set_child(grid)
+            self.listbox.append(row)
+
+        self.listbox.queue_draw()
+
+    def on_selection_changed(self, listbox):
+        selected_rows = listbox.get_selected_rows()
+        num_selected = len(selected_rows)
+        self.edit_btn.set_sensitive(num_selected == 1)
+        self.delete_btn.set_sensitive(num_selected >= 1)
 
     def create_action_buttons(self):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
@@ -151,12 +173,6 @@ class Window(Gtk.ApplicationWindow):
 
         # Attach to grid
         self.grid.attach(self.status_bar, 0, 3, 5, 1)
-
-    def on_selection_changed(self, selection):
-        model, paths = selection.get_selected_rows()
-        num_selected = len(paths)  # Now this gives the correct count
-        self.edit_btn.set_sensitive(num_selected == 1)
-        self.delete_btn.set_sensitive(num_selected >= 1)
 
     def init_styling(self):
         self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_split"))
