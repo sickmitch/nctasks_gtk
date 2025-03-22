@@ -65,10 +65,6 @@ class Window(Gtk.ApplicationWindow):
         self.due_button.set_child(self.stack)
         self.due_button.connect("clicked", on_due_date_clicked, self.due_button, self.stack, self.date_label)
         input_box.append(self.due_button)
-        
-        # self.due_button = Gtk.Button(icon_name="org.gnome.Calendar")
-        # self.due_button.connect("clicked", on_due_date_clicked, self.due_button)
-        # input_box.append(self.due_button)
 
         # ADD
         self.add_btn = Gtk.Button(label="Add Task", icon_name="list-add-symbolic")
@@ -156,10 +152,10 @@ class Window(Gtk.ApplicationWindow):
         self.edit_btn.set_sensitive(num_selected == 1)
         self.delete_btn.set_sensitive(num_selected >= 1)
 
-    def calendar_dialog(self, widget):
-            from .dialogs import on_due_date_clicked
-            on_due_date_clicked(widget, self.calendar_icon)
-            print ()
+    # def calendar_dialog(self, widget):
+    #         from .dialogs import on_due_date_clicked
+    #         on_due_date_clicked(widget, self.calendar_icon)
+    #         print ()
 
     def init_styling(self):
         self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_split"))
@@ -176,21 +172,16 @@ class Window(Gtk.ApplicationWindow):
         except Exception as e:
             print(f"Error loading CSS: {e}")
     
-class TaskItem(GObject.Object):
-    __gtype_name__ = 'TaskItem'
+# class TaskItem(GObject.Object):
+#     __gtype_name__ = 'TaskItem'
     
-    def __init__(self, uid, task, priority, status, due):
-        super().__init__()
-        self.uid = uid
-        self.task = task
-        self.priority = priority
-        self.status = status
-        self.due = due
-
-
-# Now when adding tasks, use:
-# new_item = TaskItem(uid, task, priority, status, due)
-# self.task_store.append(new_item)
+#     def __init__(self, uid, task, priority, status, due):
+#         super().__init__()
+#         self.uid = uid
+#         self.task = task
+#         self.priority = priority
+#         self.status = status
+#         self.due = due
 
 
 class MyApp(Gtk.Application):

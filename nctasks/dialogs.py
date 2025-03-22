@@ -3,7 +3,6 @@ require_versions({"Gtk": "4.0", "Adw": "1"})
 from gi.repository import Gtk, Gdk
 from datetime import datetime, timezone, date
 from icalendar import vDatetime
-import requests
 from requests.auth import HTTPBasicAuth
 from icalendar import Calendar
 
@@ -54,18 +53,33 @@ def create_edit_dialog(parent, current_summary, current_status_label,
 
     # Due date picker
     due_label = Gtk.Label(label="Due Date:")
-    due_button = Gtk.Button()
-    if current_due_date:
-        due_button.set_label(current_due_date.strftime('%Y-%m-%d'))
-    else:
-        due_button.set_label("Select Date")
-    due_button.connect("clicked", on_due_date_clicked, due_button)
     grid.attach(due_label, 0, 3, 1, 1)
+
+    due_button = Gtk.Button()
+    # due_button.set_size_request(110, -1)
+    stack = Gtk.Stack()
+    stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)  # Optional animation        
+    
+    icon = Gtk.Image.new_from_icon_name("org.gnome.Calendar")
+    date_label = Gtk.Label()
+
+    stack.add_named(icon, "icon")
+    stack.add_named(date_label, "date")
+
+    due_button.set_child(stack)
+
+    if current_due_date != None:
+        date_label.set_text(str(current_due_date))
+        stack.set_visible_child_name("date") # Initial state
+    else:
+        stack.set_visible_child_name("icon")  # Initial state
     grid.attach(due_button, 1, 3, 1, 1)
+    due_button.connect("clicked", on_due_date_clicked, due_button, stack, date_label)
 
     def on_response(dialog, response_id):
         if response_id == Gtk.ResponseType.OK:
-            handle_edit_response(
+            from .application import Application
+            Application.handle_edit_response(
                 summary_entry,
                 status_combo,
                 priority_combo,
@@ -82,60 +96,6 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     dialog.present()
     return dialog
 
-def handle_edit_response(summary_entry, status_combo, priority_combo, due_button,
-                        todo, cal_url, user, api_key, refresh_callback):
-    new_summary = summary_entry.get_text()
-    
-    status_idx = status_combo.get_active()
-    new_status_label = status_combo.get_model()[status_idx][0] if status_idx != -1 else ""
-    
-    priority_idx = priority_combo.get_active()
-    new_priority_label = priority_combo.get_model()[priority_idx][0] if priority_idx != -1 else ""
-    
-    new_due_str = due_button.get_label() #OCIO
-
-    # Map back to iCalendar values
-    status_reverse_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS", "Completed": "COMPLETED"}
-    new_status = status_reverse_map.get(new_status_label, 'NEEDS-ACTION')
-    priority_reverse_map = {'Low': 9, 'Medium': 5, 'High': 1}
-    new_priority = priority_reverse_map.get(new_priority_label, 9)
-    
-    new_due = None
-    if new_due_str != "Select Date":
-        try:
-            new_due_date = datetime.strptime(new_due_str, '%Y-%m-%d').date()
-            new_due_datetime = datetime.combine(new_due_date, datetime.min.time(), timezone.utc)
-            new_due = vDatetime(new_due_datetime).to_ical().decode('utf-8')
-        except Exception as e:
-            print(f"Error parsing date: {e}")
-
-    # Update the VTODO component
-    todo['summary'] = new_summary
-    todo['status'] = new_status
-    todo['priority'] = new_priority
-    if new_due:
-        todo['due'] = new_due
-    elif 'due' in todo:
-        del todo['due']
-
-    # Prepare and send PUT request
-    cal = Calendar()
-    cal.add('prodid', '-//NCTasks//')
-    cal.add('version', '2.0')
-    cal.add_component(todo)
-    
-    try:
-        event_url = f"{cal_url}/{todo['uid']}.ics"
-        response = requests.put(
-            event_url,
-            headers={'Content-Type': 'text/calendar; charset=utf-8'},
-            auth=HTTPBasicAuth(user, api_key),
-            data=cal.to_ical()
-        )
-        response.raise_for_status()
-        refresh_callback()
-    except Exception as e:
-        raise Exception(f"API error: {str(e)}")
 
 def on_due_date_clicked(button, due_button, stack, date_label):
     dialog = Gtk.Dialog(title="Select Due Date")
@@ -155,7 +115,7 @@ def on_due_date_clicked(button, due_button, stack, date_label):
 
     def on_date_response(dialog, response):
         if response == Gtk.ResponseType.OK:
-            selected_date = calendar.get_date().format("%Y-%m-%d")
+            selected_date = calendar.get_date().format("%d-%m-%Y")
             date_label.set_text(selected_date)
             stack.set_visible_child_name("date")  # Show date view
             due_button.selected_date = selected_date

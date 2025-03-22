@@ -27,7 +27,7 @@ class Application(Gtk.Application):
         self.window.present()
         self.window.status_bar.push(0, "Synchronized at "+ datetime.now().strftime("%H:%M:%S"))
 
-    def on_add_clicked(self, button):
+    def on_add_clicked(self, button): # OCIO
         task = self.window.task_entry.get_text()
         status_text = self.window.status_combo.get_active_text()
         priority_text = self.window.priority_combo.get_active_text()
@@ -53,14 +53,13 @@ class Application(Gtk.Application):
         todo = Todo()
         todo.add('uid', uid)
         todo.add('summary', task)
-        if new_task_due == "None":
-            new_task_due = datetime.now().strftime('%Y-%m-%d')
-        due_date = datetime.strptime(new_task_due, '%Y-%m-%d').date()
-        todo.add('due', due_date)
+        if new_task_due != "None":
+            new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
+            todo.add('due', new_task_due)
         todo.add('status', status)
         todo.add('priority', priority)
         todo.add('dtstamp', datetime.now())
-
+        
         # Create a Calendar instance and add the Todo
         cal = Calendar()
         cal.add('prodid', '-//My Calendar App//')
@@ -69,7 +68,6 @@ class Application(Gtk.Application):
 
         # Generate the .ics data
         ics_data = cal.to_ical()
-
         # Determine the URL for the new task on the server
         event_url = f"{self.cal_url}/{uid}.ics"
 
@@ -175,12 +173,14 @@ class Application(Gtk.Application):
 
         # Parse due date 
         current_due_date = None
-        if current_due:
+        if current_due != None:
             due_dt = current_due.dt
             if isinstance(due_dt, datetime):
                 self.current_due_date = due_dt.date()
             elif isinstance(due_dt, date):
                 self.current_due_date = due_dt
+        else:
+            self.current_due_date = current_due
         
         create_edit_dialog(
             parent=self.window,
@@ -194,9 +194,63 @@ class Application(Gtk.Application):
             api_key=self.api_key,
             refresh_callback=self.start_async_fetch)
 
+    def handle_edit_response(summary_entry, status_combo, priority_combo, due_button,
+                            todo, cal_url, user, api_key, refresh_callback):
+        
+        # define new Todo values
+        new_summary = summary_entry.get_text()
+        status_idx = status_combo.get_active()
+        new_status_label = status_combo.get_model()[status_idx][0] if status_idx != -1 else ""
+        priority_idx = priority_combo.get_active()
+        new_priority_label = priority_combo.get_model()[priority_idx][0] if priority_idx != -1 else ""
+        # Map back to iCalendar values
+        status_reverse_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS", "Completed": "COMPLETED"}
+        new_status = status_reverse_map.get(new_status_label, 'NEEDS-ACTION')
+        priority_reverse_map = {'Low': 9, 'Medium': 5, 'High': 1}
+        new_priority = priority_reverse_map.get(new_priority_label, 9)
+
+        # Various DUE cases handling
+        if hasattr(due_button, 'selected_date'):
+            new_due_str = due_button.selected_date
+        else:
+            new_due_str = "Not Set"
+
+        if new_due_str != "Not Set":
+            try:
+                new_due_str = datetime.strptime(new_due_str, "%d-%m-%Y").date()
+            except Exception as e:
+                print(f"Error parsing date: {e}")
+
+        # Update the VTODO component
+        todo['summary'] = new_summary
+        todo['status'] = new_status
+        todo['priority'] = new_priority
+        if new_due_str != "Not Set":                         #### ugly but works
+            del todo['due']
+            todo.add('due', new_due_str)
+        elif 'due' in todo:
+            del todo['due']
+
+        # Prepare and send PUT request
+        cal = Calendar()
+        cal.add('prodid', '-//NCTasks//')
+        cal.add('version', '2.0')
+        cal.add_component(todo)
+
+        try:
+            event_url = f"{cal_url}/{todo['uid']}.ics"
+            response = requests.put(
+                event_url,
+                headers={'Content-Type': 'text/calendar; charset=utf-8'},
+                auth=HTTPBasicAuth(user, api_key),
+                data=cal.to_ical()
+            )
+            response.raise_for_status()
+            refresh_callback()
+        except Exception as e:
+            raise Exception(f"API error: {str(e)}")
+
     def load_environment_vars(self):
-            """Load and validate required environment variables"""
-            # Load from .env file or system environment
             load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
             self.base_url = os.getenv("BASE_URL")
