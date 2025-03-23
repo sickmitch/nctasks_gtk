@@ -11,7 +11,7 @@ import requests
 import threading
 import os
 import uuid
-from .dialogs import create_edit_dialog, error_dialog
+from .dialogs import create_edit_dialog, error_dialog, setup_dialog
 
 class Application(Gtk.Application):
 
@@ -20,12 +20,10 @@ class Application(Gtk.Application):
         self.task_list = [] 
 
     def do_activate(self):
-        from .window import Window  # Import here to avoid circular import
-        self.load_environment_vars()
-        self.start_async_fetch()
+        from .window import Window
         self.window = Window(self)
         self.window.present()
-        self.window.status_bar.push(0, "Synchronized at "+ datetime.now().strftime("%H:%M:%S"))
+        self.load_environment_vars()
 
     def on_add_clicked(self, button): # OCIO
         task = self.window.task_entry.get_text()
@@ -196,7 +194,6 @@ class Application(Gtk.Application):
 
     def handle_edit_response(summary_entry, status_combo, priority_combo, due_button,
                             todo, cal_url, user, api_key, refresh_callback):
-        
         # define new Todo values
         new_summary = summary_entry.get_text()
         status_idx = status_combo.get_active()
@@ -214,7 +211,6 @@ class Application(Gtk.Application):
             new_due_str = due_button.selected_date
         else:
             new_due_str = "Not Set"
-
         if new_due_str != "Not Set":
             try:
                 new_due_str = datetime.strptime(new_due_str, "%d-%m-%Y").date()
@@ -251,28 +247,49 @@ class Application(Gtk.Application):
             raise Exception(f"API error: {str(e)}")
 
     def load_environment_vars(self):
-            load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        load_dotenv(env_path)
+        def check_missing_env(base_url, user, api_key, calendar, root_dir):
+            required = {
+                "BASE_URL": base_url,
+                "USERNAME": user,
+                "API_KEY": api_key,
+                "CALENDAR": calendar,
+                "ROOT_DIR": root_dir
+            }
+            missing = [var for var, val in required.items() if not val]
+            return missing
+        # Assign variables from .env
+        self.base_url = os.getenv("BASE_URL")
+        self.user = os.getenv("USERNAME")
+        self.api_key = os.getenv("API_KEY")
+        self.calendar = os.getenv("CALENDAR")
+        self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_gtk"))
 
-            self.base_url = os.getenv("BASE_URL")
-            self.user = os.getenv("USERNAME")
-            self.calendar = os.getenv("CALENDAR")
-            self.api_key = os.getenv("API_KEY")
-            self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_gtk"))
-
-            missing = []
-            if not self.base_url: missing.append("BASE_URL")
-            if not self.user: missing.append("USERNAME")
-            if not self.api_key: missing.append("API_KEY")
-
-            if missing:
-                raise ValueError(
-                    f"Missing required environment variables:\n"
-                    f"{', '.join(missing)}\n\n"
-                    f"Create a .env file with these values or set them system-wide."
-                )
-
+        missing = check_missing_env(self.base_url,self.user,self.api_key,self.calendar,self.root_dir)
+        if missing:
+            if self.window.get_mapped():
+                setup_dialog(missing,parent=self.window,refresh_callback=self.load_environment_vars)
+        else:
             self.cal_url = f"{self.base_url}/remote.php/dav/calendars/{self.user}/{self.calendar}"
             self.ics_file = os.path.join(self.root_dir, 'tasks')
+            self.start_async_fetch()           
+            
+    def handle_setup_response(url, user, api_key, calendar, root_dir, refresh_callback):
+        module_dir = os.path.dirname(os.path.abspath(__file__))
+        env_path = os.path.join(module_dir, '.env')
+    
+        env_content = f'''
+BASE_URL="{url}"
+USERNAME="{user}"
+API_KEY="{api_key}"
+CALENDAR="{calendar}"
+ROOT_DIR="{root_dir}"
+        '''
+        with open(env_path, 'w') as env_file:
+            env_file.write(env_content)
+        
+        refresh_callback()
 
     def start_async_fetch(self):
         threading.Thread(target=self.fetch_caldav_data, daemon=True).start()

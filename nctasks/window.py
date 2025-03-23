@@ -26,7 +26,6 @@ class Window(Gtk.ApplicationWindow):
         
     def create_input_fields(self):
         from .dialogs import on_due_date_clicked
-        
         input_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         self.grid.attach(input_box, 0, 0, 5, 1)
         self.task_entry = Gtk.Entry(
@@ -159,7 +158,7 @@ class Window(Gtk.ApplicationWindow):
         self.delete_btn.set_sensitive(num_selected >= 1)
 
     def init_styling(self):
-        self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_split"))
+        self.root_dir = os.path.dirname(__file__)
         css_provider = Gtk.CssProvider()
         try:
             css_path = os.path.join(self.root_dir, 'style.css')
