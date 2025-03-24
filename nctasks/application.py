@@ -199,7 +199,6 @@ class Application(Gtk.Application):
         todo['status'] = new_status
         todo['priority'] = new_priority
         if new_due_str != "Not Set":                         #### ugly but works
-            del todo['due']
             todo.add('due', new_due_str)
         elif 'due' in todo:
             del todo['due']
