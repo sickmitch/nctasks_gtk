@@ -35,6 +35,7 @@ class Window(Gtk.ApplicationWindow):
             halign=Gtk.Align.FILL,
             xalign=0.5  
         )
+        self.task_entry.connect("activate", self.app.on_add_clicked)
         input_box.append(self.task_entry)
         #STATUS
         self.status_combo = Gtk.ComboBoxText()

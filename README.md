@@ -1,7 +1,7 @@
 # NCTasks
 
 To use this: 1) clone the repo 2) run the entrypoint that is tasks.py 3) fill in setup. To update just pull the repo. <br />
-**BE CAREFULL** it's very early in development so backup your calendars before using it, if you don't know [this](https://codeberg.org/BernieO/calcardbackup) can be very usefull.<br />
+**BE CAREFULL** it's very early in development so backup your calendars before using it, if you don't know how to do it [this](https://codeberg.org/BernieO/calcardbackup) can be very usefull.<br />
 Do not use if the calendar MUST be preserved, I can't ensure on results.
 
 ## Dependencies
@@ -22,7 +22,8 @@ If you get errors on runtime and find out missing dependencies please PR to this
     `curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'`
 
 ## Known problems
-  - [ ] Can't manage activities created on the browser view (they create the url without relation to UID, need to adapt)
+  - [ ] Can't manage activities created on the browser view (they create the url without relation to UID, need to adapt) (WIP)
+    - Started working on it, delete works but edit excalated badly
   - [ ] Tasks with same summary, totally or a part of it, gets confused and will be picked up the first met from top in the tasks file
 
 ## To implement: <br />

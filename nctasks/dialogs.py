@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 #### EDIT DIALOG
 def create_edit_dialog(parent, current_summary, current_status_label, 
                       current_priority_label, current_due_date, todo,
-                      cal_url, user, api_key, refresh_callback):
+                      cal_url, user, api_key, uid, refresh_callback, extract_uid_to_href):
     dialog = Gtk.Dialog(title="Edit Task")
     dialog.set_transient_for(parent)
     dialog.set_modal(True)
@@ -86,7 +86,9 @@ def create_edit_dialog(parent, current_summary, current_status_label,
                 cal_url,
                 user,
                 api_key,
-                refresh_callback
+                uid,
+                refresh_callback,
+                extract_uid_to_href
             )
         dialog.destroy()
 

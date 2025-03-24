@@ -7,6 +7,7 @@ from datetime import datetime, timezone, date
 from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
 import requests
+from urllib.parse import urlparse, urljoin
 import threading
 import os
 import uuid
@@ -83,32 +84,84 @@ class Application(Gtk.Application):
         self.window.status_combo.set_active(0)
         self.window.priority_combo.set_active(0)
         self.window.stack.set_visible_child_name("icon")  # Show date view
+        if hasattr(self.window.due_button, 'selected_date'):
+            del self.window.due_button.selected_date
         self.start_async_fetch()
     
     ### SYNC BUTTON HANDLER
     def on_sync_clicked(self, button):
         self.start_async_fetch()
+
+    ### HREF EXTRACT 
+    def extract_uid_to_href(self):
+        try:
+            tree = ET.parse(self.ics_file)
+        except ET.ParseError as e:
+            raise ValueError(f"Failed to parse XML file: {e}")
     
-    ### DELETE BUTTON HANDLER
+        root = tree.getroot()
+        namespaces = {
+            'd': 'DAV:',
+            'cal': 'urn:ietf:params:xml:ns:caldav'
+        }
+        uid_to_href = {}
+
+        for response in root.findall('d:response', namespaces):
+            href_element = response.find('d:href', namespaces)
+            if href_element is None:
+                continue
+            href = href_element.text.strip()
+
+            propstat = response.find('d:propstat', namespaces)
+            if propstat is None:
+                continue
+            prop = propstat.find('d:prop', namespaces)
+            if prop is None:
+                continue
+            calendar_data_element = prop.find('cal:calendar-data', namespaces)
+            if calendar_data_element is None or not calendar_data_element.text:
+                continue
+
+            uid_in_cal = None
+            for line in calendar_data_element.text.splitlines():
+                line = line.strip()
+                if line.startswith('UID:'):
+                    uid_in_cal = line.split(':', 1)[1].strip()
+                    break
+            if uid_in_cal:
+                uid_to_href[uid_in_cal] = href
+
+        return uid_to_href
+
+
     def on_del_clicked(self, button):
         selection = self.window.treeview.get_selection()
         model, paths = selection.get_selected_rows()
-        # Collect all UIDs to remove
-        uids_to_remove = []
-        for path in paths:
-            treeiter = model.get_iter(path)
-            uid_to_remove = model[treeiter][0]  # Get the UID of the selected task
-            uids_to_remove.append(uid_to_remove)
-        # Construct the URLs for the tasks to delete
+        uids_to_remove = [model[model.get_iter(path)][0] for path in paths]
+
+        try:
+            uid_to_href = self.extract_uid_to_href()
+        except ValueError as e:
+            error_dialog(str(e))
+            return
+
+        parsed_cal_url = urlparse(self.cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+
         for uid in uids_to_remove:
-            event_url = f"{self.cal_url}/{uid}.ics" ### Change here to fix browser created tasks (TODO)
+            event_href = uid_to_href.get(uid)
+            if not event_href:
+                error_dialog(f"No URL found for task with UID {uid}")
+                continue
+
+            event_url = urljoin(server_base, event_href)
             try:
-                # Send a DELETE request to the server
                 response = requests.delete(
                     url=event_url,
-                    auth=HTTPBasicAuth(self.user, self.api_key))
-                response.raise_for_status() 
-                # Remove the task from the local calendar
+                    auth=HTTPBasicAuth(self.user, self.api_key)
+                )
+                response.raise_for_status()
+
                 for component in self.cal.subcomponents:
                     if component.name == 'VTODO' and str(component.get('uid')) == uid:
                         self.cal.subcomponents.remove(component)
@@ -116,7 +169,7 @@ class Application(Gtk.Application):
                 self.window.status_bar.push(0, "Task successfully deleted from server")
             except requests.exceptions.RequestException as e:
                 error_dialog(f"Failed to delete task from server: {e}")
-        # Save the updated calendar and refresh the task list
+
         self.start_async_fetch()
     
     ### EDIT BUTTON HANDLER
@@ -168,11 +221,13 @@ class Application(Gtk.Application):
             cal_url=self.cal_url,
             user=self.user,
             api_key=self.api_key,
-            refresh_callback=self.start_async_fetch)
+            uid=uid,
+            refresh_callback=self.start_async_fetch,
+            extract_uid_to_href=self.extract_uid_to_href)
 
     ### HANDLE EDIT TASK NEW VALUES
     def handle_edit_response(summary_entry, status_combo, priority_combo, due_button,
-                            todo, cal_url, user, api_key, refresh_callback):
+                            todo, cal_url, user, api_key, uid, refresh_callback, extract_uid_to_href):
         # define new Todo values
         new_summary = summary_entry.get_text()
         status_idx = status_combo.get_active()
@@ -199,7 +254,6 @@ class Application(Gtk.Application):
         todo['status'] = new_status
         todo['priority'] = new_priority
         if new_due_str != "Not Set":                         #### ugly but works
-            del todo['due']
             todo.add('due', new_due_str)
         elif 'due' in todo:
             del todo['due']
@@ -208,8 +262,14 @@ class Application(Gtk.Application):
         cal.add('prodid', '-//NCTasks//')
         cal.add('version', '2.0')
         cal.add_component(todo)
+
+        uid_to_href = extract_uid_to_href()
+        event_href = uid_to_href.get(uid)
+        parsed_cal_url = urlparse(cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+        
         try:
-            event_url = f"{cal_url}/{todo['uid']}.ics"
+            event_url = urljoin(server_base, event_href)
             response = requests.put(
                 event_url,
                 headers={'Content-Type': 'text/calendar; charset=utf-8'},
