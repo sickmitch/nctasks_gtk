@@ -7,7 +7,7 @@ Do not use if the calendar MUST be preserved, I can't ensure on results.
 ## Dependencies
 Tested only on Arch Linux for now, if you try on different platforms please report back.<br />
 If you get errors on runtime and find out missing dependencies please PR to this README, much appreciate. <br />
-`sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar python-dotenv` 
+    `sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar python-dotenv` 
 
 ## Setup Help
   ### Create API key in Nextcloud from browser<br />
