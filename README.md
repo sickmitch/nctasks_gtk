@@ -22,6 +22,7 @@ If you get errors on runtime and find out missing dependencies please PR to this
     `curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'`
 
 ## Known problems
+  - [ ] Opening edit dialog for a task with due set visually the due button to the date (with wrong format) but doesn't set the due_button.selected_date for the button so closing with OK removes the due since the button is created without it
   - [ ] Can't manage activities created on the browser view (they create the url without relation to UID, need to adapt)
   - [ ] Tasks with same summary, totally or a part of it, gets confused and will be picked up the first met from top in the tasks file
 
