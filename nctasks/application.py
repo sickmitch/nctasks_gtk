@@ -4,7 +4,6 @@ from gi.repository import Gtk, GLib
 from requests.auth import HTTPBasicAuth
 from icalendar import Calendar, Todo
 from datetime import datetime, timezone, date
-from datetime import datetime
 from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
 import requests
@@ -14,7 +13,6 @@ import uuid
 from .dialogs import create_edit_dialog, error_dialog, setup_dialog
 
 class Application(Gtk.Application):
-
     def __init__(self):
         super().__init__(application_id="com.sickmitch.NCTasks")
         self.task_list = [] 
@@ -25,28 +23,28 @@ class Application(Gtk.Application):
         self.window.present()
         self.load_environment_vars()
 
-    def on_add_clicked(self, button): # OCIO
+    ### ADD BUTTON HANDLER
+    def on_add_clicked(self, button):
+        # Fetch values from UI
         task = self.window.task_entry.get_text()
         status_text = self.window.status_combo.get_active_text()
-        priority_text = self.window.priority_combo.get_active_text()
+        priority_text = self.window.priority_combo.get_active_text()        
+        # Handle no due 
         if hasattr(self.window.due_button, 'selected_date'):
             new_task_due = self.window.due_button.selected_date
         else:
             new_task_due = "None"
-
+        # Handle empty summary entry
         if not task:
             error_dialog("! Tasks needs a summary !")
             return
-
+        # Map to right format
         status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
         status = status_map.get(status_text, "NEEDS-ACTION")
-
         priority_map = {"Low": 9, "Medium": 5, "High": 1}
         priority = priority_map.get(priority_text, 9)
-
         # Generate a unique UID for the task
         uid = str(uuid.uuid4())
-
         # Create a Todo component
         todo = Todo()
         todo.add('uid', uid)
@@ -57,20 +55,17 @@ class Application(Gtk.Application):
         todo.add('status', status)
         todo.add('priority', priority)
         todo.add('dtstamp', datetime.now())
-        
         # Create a Calendar instance and add the Todo
         cal = Calendar()
         cal.add('prodid', '-//My Calendar App//')
         cal.add('version', '2.0')
         cal.add_component(todo)
-
         # Generate the .ics data
         ics_data = cal.to_ical()
         # Determine the URL for the new task on the server
         event_url = f"{self.cal_url}/{uid}.ics"
-
+        #  Push the .ics data to the server using PUT, handle errors
         try:
-            # Push the .ics data to the server using PUT
             response = requests.put(
                 url=event_url,
                 headers={
@@ -81,94 +76,78 @@ class Application(Gtk.Application):
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            self.show_error(f"Failed to add task to server: {e}")
+            error_dialog(f"Failed to add task to server: {e}")
             return
-
-        # Clear the input field and update the task list
+        # Reset input fields and update the task list
         self.window.task_entry.set_text('')
+        self.window.status_combo.set_active(0)
+        self.window.priority_combo.set_active(0)
+        self.window.stack.set_visible_child_name("icon")  # Show date view
         self.start_async_fetch()
-
+    
+    ### SYNC BUTTON HANDLER
     def on_sync_clicked(self, button):
         self.start_async_fetch()
-
+    
+    ### DELETE BUTTON HANDLER
     def on_del_clicked(self, button):
         selection = self.window.treeview.get_selection()
         model, paths = selection.get_selected_rows()
-
-        if not paths:
-            return  # No rows selected
-
         # Collect all UIDs to remove
         uids_to_remove = []
         for path in paths:
             treeiter = model.get_iter(path)
             uid_to_remove = model[treeiter][0]  # Get the UID of the selected task
             uids_to_remove.append(uid_to_remove)
-
         # Construct the URLs for the tasks to delete
         for uid in uids_to_remove:
             event_url = f"{self.cal_url}/{uid}.ics"
-
             try:
                 # Send a DELETE request to the server
                 response = requests.delete(
                     url=event_url,
-                    auth=HTTPBasicAuth(self.user, self.api_key)
-                )
-                response.raise_for_status()  # Raise an exception for HTTP errors
-
+                    auth=HTTPBasicAuth(self.user, self.api_key))
+                response.raise_for_status() 
                 # Remove the task from the local calendar
                 for component in self.cal.subcomponents:
                     if component.name == 'VTODO' and str(component.get('uid')) == uid:
                         self.cal.subcomponents.remove(component)
                         break
-                
                 self.window.status_bar.push(0, "Task successfully deleted from server")
-
             except requests.exceptions.RequestException as e:
-                self.show_error(f"Failed to delete task from server: {e}")
-
+                error_dialog(f"Failed to delete task from server: {e}")
         # Save the updated calendar and refresh the task list
         self.start_async_fetch()
-
-    def on_edit_clicked(self, button):  ###### DA SISTEMARE
+    
+    ### EDIT BUTTON HANDLER
+    def on_edit_clicked(self, button): 
         # Get selected rows from TreeView's selection
         selection = self.window.treeview.get_selection()
         model, paths = selection.get_selected_rows()
-
         # Check number of selected items
         num_selected = len(paths)
-        if num_selected != 1:  # Require exactly one selection for editing
-            return
-
-        # Get UID from the first (and only) selected row
         treeiter = model.get_iter(paths[0])
         uid = model[treeiter][0]
-
-        # Find the VTODO component (rest of your code remains unchanged)
+        # Find the VTODO component
         todo = None
         for component in self.cal.walk():
             if component.name == 'VTODO' and str(component.get('uid')) == uid:
                 todo = component
                 break
         if not todo:
-            self.show_error("Task not found!")
+            error_dialog("Task not found!")
             return
-
         # Get current values
         self.current_summary = str(todo.get('summary', ''))
         current_status = str(todo.get('status', 'NEEDS-ACTION'))
         current_priority = int(todo.get('priority', 9))
         current_due = todo.get('due')
-
         # Map status to UI labels (unchanged)
         status_map = {'NEEDS-ACTION': 'Todo', 'IN-PROCESS': 'Started', 'COMPLETED': 'Completed'}
         self.current_status_label = status_map.get(current_status, 'Todo')
-
         # Map priority to UI labels (unchanged)
         priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
         self.current_priority_label = priority_map.get(current_priority, 'Low')
-
         # Parse due date 
         current_due_date = None
         if current_due != None:
@@ -179,7 +158,6 @@ class Application(Gtk.Application):
                 self.current_due_date = due_dt
         else:
             self.current_due_date = current_due
-        
         create_edit_dialog(
             parent=self.window,
             current_summary=self.current_summary,
@@ -192,6 +170,7 @@ class Application(Gtk.Application):
             api_key=self.api_key,
             refresh_callback=self.start_async_fetch)
 
+    ### HANDLE EDIT TASK NEW VALUES
     def handle_edit_response(summary_entry, status_combo, priority_combo, due_button,
                             todo, cal_url, user, api_key, refresh_callback):
         # define new Todo values
@@ -205,7 +184,6 @@ class Application(Gtk.Application):
         new_status = status_reverse_map.get(new_status_label, 'NEEDS-ACTION')
         priority_reverse_map = {'Low': 9, 'Medium': 5, 'High': 1}
         new_priority = priority_reverse_map.get(new_priority_label, 9)
-
         # Various DUE cases handling
         if hasattr(due_button, 'selected_date'):
             new_due_str = due_button.selected_date
@@ -216,7 +194,6 @@ class Application(Gtk.Application):
                 new_due_str = datetime.strptime(new_due_str, "%d-%m-%Y").date()
             except Exception as e:
                 print(f"Error parsing date: {e}")
-
         # Update the VTODO component
         todo['summary'] = new_summary
         todo['status'] = new_status
@@ -226,13 +203,11 @@ class Application(Gtk.Application):
             todo.add('due', new_due_str)
         elif 'due' in todo:
             del todo['due']
-
         # Prepare and send PUT request
         cal = Calendar()
         cal.add('prodid', '-//NCTasks//')
         cal.add('version', '2.0')
         cal.add_component(todo)
-
         try:
             event_url = f"{cal_url}/{todo['uid']}.ics"
             response = requests.put(
@@ -246,6 +221,7 @@ class Application(Gtk.Application):
         except Exception as e:
             raise Exception(f"API error: {str(e)}")
 
+    ### LOAD UP ENV AND CHECK FOR MISSING, IF SOMETHING MISSING TRIGGER SETUP
     def load_environment_vars(self):
         env_path = os.path.join(os.path.dirname(__file__), '.env')
         load_dotenv(env_path)
@@ -265,7 +241,7 @@ class Application(Gtk.Application):
         self.api_key = os.getenv("API_KEY")
         self.calendar = os.getenv("CALENDAR")
         self.root_dir = os.getenv("ROOT_DIR", os.path.expanduser("~/.config/nctasks_gtk"))
-
+        # Check for missing variables
         missing = check_missing_env(self.base_url,self.user,self.api_key,self.calendar,self.root_dir)
         if missing:
             if self.window.get_mapped():
@@ -275,10 +251,11 @@ class Application(Gtk.Application):
             self.ics_file = os.path.join(self.root_dir, 'tasks')
             self.start_async_fetch()           
             
+    ### HANDLE SETUP DIALOG VALUES
     def handle_setup_response(url, user, api_key, calendar, root_dir, refresh_callback):
         module_dir = os.path.dirname(os.path.abspath(__file__))
         env_path = os.path.join(module_dir, '.env')
-    
+        # Write to .env
         env_content = f'''
 BASE_URL="{url}"
 USERNAME="{user}"
@@ -288,12 +265,14 @@ ROOT_DIR="{root_dir}"
         '''
         with open(env_path, 'w') as env_file:
             env_file.write(env_content)
-        
         refresh_callback()
 
+    ### ASYNC FETCH
     def start_async_fetch(self):
+        self.window.status_bar.push(0, "  Calling Nextcloud server.....")
         threading.Thread(target=self.fetch_caldav_data, daemon=True).start()
 
+    ### FETCHING
     def fetch_caldav_data(self):
         try:
             # Send PROPFIND request to CalDAV server
@@ -312,51 +291,40 @@ ROOT_DIR="{root_dir}"
                             <cal:calendar-data/>
                         </d:prop>
                     </d:propfind>''',
-                timeout=10  # Set timeout to avoid hanging requests
+                timeout=10 
             )
-
             # Check if the response is valid
             response.raise_for_status()
-
             # Ensure response contains XML/ICS data
             if "xml" not in response.headers.get("Content-Type", ""):
                 raise ValueError("Invalid response content type. Expected XML.")
-
             # Save received data
             os.makedirs(os.path.dirname(self.ics_file), exist_ok=True)
             with open(self.ics_file, 'wb') as f:
                 f.write(response.content)
-
             # Update UI with fresh data
             GLib.idle_add(self.update_calendar_data)
-
         except requests.exceptions.RequestException as e:
             error_message = f"Sync failed: {str(e)}"
-            print(error_message)  # Debugging
-            GLib.idle_add(self.show_error, error_message)
-
+            GLib.idle_add(error_dialog, error_message)
         except Exception as e:
             error_message = f"Unexpected error: {str(e)}"
-            print(error_message)  # Debugging
-            GLib.idle_add(self.show_error, error_message)
-
+            GLib.idle_add(error_dialog, error_message)
         finally:
-            self.window.status_bar.push(0, "Synchronized at "+ datetime.now().strftime("%H:%M:%S"))
+            self.window.status_bar.push(0, "󰪩  Successfully synchronized at "+ datetime.now().strftime("%H:%M:%S"))
 
+    ### LOAD NEW DATA AND UPDATE UI
     def update_calendar_data(self):
-        """Load and display calendar data"""
         self.cal = self.load_or_create_calendar()
         self.update_task_list()
-        # self.status_bar.push(0, "Synchronized: " + datetime.now().strftime("%H:%M:%S"))
 
+    ### LOAD THE .ICS INTO MEMORY
     def load_or_create_calendar(self):
         cal = Calendar()
         cal.add('prodid', '-//NCTasks//mxm.dk//')
         cal.add('version', '2.0')
-
         if not os.path.exists(self.ics_file):
             return cal
-
         try:
             # Parse XML and extract calendar data
             tree = ET.parse(self.ics_file)
@@ -367,17 +335,14 @@ ROOT_DIR="{root_dir}"
                 'd': 'DAV:',
                 'cal': 'urn:ietf:params:xml:ns:caldav'
             }
-            
             # Find all successful responses with calendar data
             for response in root.findall('.//d:response', namespaces):
                 status = response.find('.//d:status', namespaces)
                 if status is None or '200 OK' not in status.text:
                     continue
-                
                 calendar_data = response.find('.//cal:calendar-data', namespaces)
                 if calendar_data is None:
                     continue
-                
                 # Parse iCalendar content
                 ical_content = calendar_data.text.strip()
                 try:
@@ -387,37 +352,31 @@ ROOT_DIR="{root_dir}"
                             cal.add_component(component)
                 except Exception as e:
                     print(f"Error parsing iCalendar content: {e}")
-            
             return cal
-            
         except Exception as e:
             print(f"Error loading calendar data: {e}")
             return cal
-
+    
+    ### PARSE AND ASSIGN THE TASK LIST
     def update_task_list(self):
         priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
         priority_sort_order = {'High': 3, 'Medium': 2, 'Low': 1, 'Not Set': 0}
         status_map = {'IN-PROCESS': 'Started', 'NEEDS-ACTION': 'Todo', 'COMPLETED': 'Completed'}
-
         self.task_list.clear()
         tasks = []
         parent_to_children = {}
-
         # First pass: collect all tasks and build parent-child relationships
         for component in self.cal.walk():
             if component.name == 'VTODO':
                 try:
                     uid = str(component.get('uid', ''))
                     task = str(component.get('summary', 'Untitled Task'))
-
                     # Map priority to descriptive label
                     priority_val = int(component.get('priority', '9999'))  # Default to "Not Set"
                     priority = priority_map.get(priority_val, 'Not Set')
-
                     # Map status to descriptive label
                     status_val = str(component.get('status', 'None'))
                     status = status_map.get(status_val, 'None')
-
                     # Parse the due field
                     due = component.get('due')
                     if due:
@@ -440,7 +399,6 @@ ROOT_DIR="{root_dir}"
                     else:
                         due_date = datetime.max.replace(tzinfo=timezone.utc)  # Make datetime max timezone-aware
                         due_str = 'Not Set'
-
                     # Check for RELATED-TO field
                     related_to = str(component.get('related-to', ''))
                     if related_to:
@@ -449,13 +407,10 @@ ROOT_DIR="{root_dir}"
                         parent_to_children[related_to].append((uid, task, priority, status, due_str, due_date))
                     else:
                         tasks.append((uid, task, priority, status, due_str, due_date))
-
                 except Exception as e:
                     print(f"Error parsing task: {e}")
-
         # Sort tasks: first by due date (ascending), then by priority (descending)
         tasks.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
-
         # Populate self.task_list with sorted tasks, ensuring children follow their parents
         for uid, task, priority, status, due_str, _ in tasks:
             self.task_list.append([uid, task, priority, status, due_str])

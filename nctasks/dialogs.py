@@ -18,7 +18,7 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     dialog.set_modal(True)
     dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
     dialog.add_button("OK", Gtk.ResponseType.OK)
-
+    #Define dialog and grid
     content_area = dialog.get_content_area()
     grid = Gtk.Grid()
     grid.set_column_spacing(10)
@@ -28,16 +28,13 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     grid.set_margin_top(15)
     grid.set_margin_bottom(15)
     content_area.append(grid)
-
     # Summary field
     summary_label = Gtk.Label(label="Summary:")
     summary_entry = Gtk.Entry(xalign=0.5)
     summary_entry.set_text(current_summary)
     summary_entry.set_size_request(250, -1)
-
     grid.attach(summary_label, 0, 0, 1, 1)
     grid.attach(summary_entry, 1, 0, 1, 1)
-
     # Status combo
     status_label = Gtk.Label(label="Status:")
     status_combo = Gtk.ComboBoxText()
@@ -48,7 +45,6 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     status_renderer.set_property("xalign", 0.5)
     grid.attach(status_label, 0, 1, 1, 1)
     grid.attach(status_combo, 1, 1, 1, 1)
-
     # Priority combo
     priority_label = Gtk.Label(label="Priority:")
     priority_combo = Gtk.ComboBoxText()
@@ -59,24 +55,17 @@ def create_edit_dialog(parent, current_summary, current_status_label,
     priority_renderer.set_property("xalign", 0.5)
     grid.attach(priority_label, 0, 2, 1, 1)
     grid.attach(priority_combo, 1, 2, 1, 1)
-
     # Due date picker
     due_label = Gtk.Label(label="Due Date:")
     grid.attach(due_label, 0, 3, 1, 1)
-
     due_button = Gtk.Button()
-    # due_button.set_size_request(110, -1)
     stack = Gtk.Stack()
     stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)  # Optional animation        
-    
     icon = Gtk.Image.new_from_icon_name("org.gnome.Calendar")
     date_label = Gtk.Label()
-
     stack.add_named(icon, "icon")
     stack.add_named(date_label, "date")
-
     due_button.set_child(stack)
-
     if current_due_date != None:
         date_label.set_text(str(current_due_date))
         stack.set_visible_child_name("date") # Initial state
@@ -107,6 +96,7 @@ def create_edit_dialog(parent, current_summary, current_status_label,
 
 #### CALENDAR
 def on_due_date_clicked(button, due_button, stack, date_label):
+    #Define dialog
     dialog = Gtk.Dialog(title="Select Due Date")
     dialog.set_transient_for(button.get_root())
     dialog.set_modal(True)
@@ -139,26 +129,24 @@ def on_due_date_clicked(button, due_button, stack, date_label):
 
 #### SETUP DIALOG
 def setup_dialog(missing, parent, refresh_callback):
-
     parent.present()
     parent.grab_focus()
-
+    # Dialog 
     dialog = Gtk.Dialog(title="Setup NCTasks", transient_for=parent, modal=True)
     dialog.set_transient_for(parent)
     dialog.set_application(parent.get_application())
     dialog.set_size_request(1000, 400)
-
+    # Header 
     header_bar = Gtk.HeaderBar()
     header_bar.set_title_widget(Gtk.Label(label="Fill to setup NCTasks"))
     header_bar.set_show_title_buttons(False)
     dialog.set_titlebar(header_bar)
-
+    # Buttons
     dialog.add_buttons(
         "Cancel", Gtk.ResponseType.CANCEL,
         "Git Help", Gtk.ResponseType.HELP,
-        "Submit", Gtk.ResponseType.OK,
-    )
-
+        "Submit", Gtk.ResponseType.OK,)
+    # Grid
     content_area = dialog.get_content_area()
     grid = Gtk.Grid()
     grid.set_column_spacing(10)
@@ -167,7 +155,7 @@ def setup_dialog(missing, parent, refresh_callback):
     grid.set_margin_end(15)
     grid.set_margin_top(15)
     grid.set_margin_bottom(15)
-    
+    # Url
     url_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "BASE_URL" not in missing:
         url_entry.set_text(os.getenv("BASE_URL"))
@@ -175,7 +163,7 @@ def setup_dialog(missing, parent, refresh_callback):
     url_entry.set_size_request(250, -1)
     grid.attach(url_label, 0, 1, 1, 1)
     grid.attach(url_entry, 1, 1, 1, 1)
-
+    # User
     user_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "USERNAME" not in missing:
         user_entry.set_text(os.getenv("USERNAME"))
@@ -183,7 +171,7 @@ def setup_dialog(missing, parent, refresh_callback):
     user_entry.set_size_request(250, -1)
     grid.attach(user_label, 0, 2, 1, 1)
     grid.attach(user_entry, 1, 2, 1, 1)
-
+    # Api_key
     api_key_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "API_KEY" not in missing:
         api_key_entry.set_text(os.getenv("API_KEY"))
@@ -191,8 +179,7 @@ def setup_dialog(missing, parent, refresh_callback):
     api_key_entry.set_size_request(250, -1)
     grid.attach(api_key_label, 0, 3, 1, 1)
     grid.attach(api_key_entry, 1, 3, 1, 1)
-
-            
+    # Calendar            
     calendar_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "CALENDAR" not in missing:
         calendar_entry.set_text(os.getenv("CALENDAR"))
@@ -200,7 +187,7 @@ def setup_dialog(missing, parent, refresh_callback):
     calendar_entry.set_size_request(250, -1)
     grid.attach(calendar_label, 0, 4, 1, 1)
     grid.attach(calendar_entry, 1, 4, 1, 1)
-
+    # Root_dir
     root_dir_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "ROOT_DIR" not in missing:
         root_dir_entry.set_text(os.getenv("ROOT_DIR"))

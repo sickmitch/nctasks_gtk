@@ -1,6 +1,6 @@
 from gi import require_versions
 require_versions({"Gtk": "4.0", "Adw": "1"})
-from gi.repository import Gtk, GObject, Gdk
+from gi.repository import Gtk, Gdk
 import os
 
 class Window(Gtk.ApplicationWindow):
@@ -24,6 +24,7 @@ class Window(Gtk.ApplicationWindow):
         self.create_status_bar()
         self.set_child(self.grid)
         
+    ### GENERATE UI UP TO DOWN 
     def create_input_fields(self):
         from .dialogs import on_due_date_clicked
         input_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
@@ -35,7 +36,6 @@ class Window(Gtk.ApplicationWindow):
             xalign=0.5  
         )
         input_box.append(self.task_entry)
-        
         #STATUS
         self.status_combo = Gtk.ComboBoxText()
         for status in ["Todo", "Started"]:
@@ -44,7 +44,6 @@ class Window(Gtk.ApplicationWindow):
         status_renderer = self.status_combo.get_cells()[0]
         status_renderer.set_property("xalign", 0.5)
         input_box.append(self.status_combo)
-
         #PRIO
         self.priority_combo = Gtk.ComboBoxText()
         for priority in ["Low", "Medium", "High"]:
@@ -53,24 +52,19 @@ class Window(Gtk.ApplicationWindow):
         priority_renderer = self.priority_combo.get_cells()[0]
         priority_renderer.set_property("xalign", 0.5)
         input_box.append(self.priority_combo)
-
         # DUE
         self.due_button = Gtk.Button()
         self.due_button.set_size_request(110, -1)
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)  # Optional animation        
-        
         icon = Gtk.Image.new_from_icon_name("org.gnome.Calendar")
         self.date_label = Gtk.Label()
-
         self.stack.add_named(icon, "icon")
         self.stack.add_named(self.date_label, "date")
         self.stack.set_visible_child_name("icon")  # Initial state
-
         self.due_button.set_child(self.stack)
         self.due_button.connect("clicked", on_due_date_clicked, self.due_button, self.stack, self.date_label)
         input_box.append(self.due_button)
-
         # ADD
         self.add_btn = Gtk.Button(label="Add Task", icon_name="list-add-symbolic")
         self.add_btn.connect("clicked", self.app.on_add_clicked)
@@ -80,12 +74,10 @@ class Window(Gtk.ApplicationWindow):
         self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
         self.app.task_list = Gtk.ListStore(str, str, str, str, str)  # UID, Task, Priority, Status, Due
         self.treeview = Gtk.TreeView(model=self.app.task_list)
-
         # Enable multiple selection
         selection = self.treeview.get_selection()
         selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         selection.connect("changed", self.on_selection_changed)
-
         # Configure columns
         columns = [
             ("Task", 1),
@@ -93,18 +85,15 @@ class Window(Gtk.ApplicationWindow):
             ("Status", 3),
             ("Due", 4)
         ]
-
         for i, (title, col_id) in enumerate(columns):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(title, renderer, text=col_id)
             self.treeview.append_column(column)
-
         self.scrolled_window.set_child(self.treeview)
         self.grid.attach(self.scrolled_window, 0, 1, 5, 1)
 
     def create_action_buttons(self):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-
         ## SYNC BUTTON
         image_refresh = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
         image_refresh.set_pixel_size(16)
@@ -115,7 +104,6 @@ class Window(Gtk.ApplicationWindow):
         self.sync_btn.set_child(btn_content)  
         self.sync_btn.connect("clicked", self.app.on_sync_clicked)
         btn_box.append(self.sync_btn)
-
         ##REMOVE BUTTON
         image_refresh = Gtk.Image.new_from_icon_name("edit-delete-symbolic")
         image_refresh.set_pixel_size(16)
@@ -127,7 +115,6 @@ class Window(Gtk.ApplicationWindow):
         self.delete_btn.connect("clicked", self.app.on_del_clicked)
         self.delete_btn.set_sensitive(False)
         btn_box.append(self.delete_btn)
-
         ##EDIT BUTTON
         image_refresh = Gtk.Image.new_from_icon_name("document-open-symbolic")
         image_refresh.set_pixel_size(16)
@@ -139,7 +126,6 @@ class Window(Gtk.ApplicationWindow):
         self.edit_btn.connect("clicked", self.app.on_edit_clicked)
         self.edit_btn.set_sensitive(False)
         btn_box.append(self.edit_btn)
-
         self.grid.attach(btn_box, 0, 2, 5, 1)
 
     def create_status_bar(self):
@@ -147,16 +133,17 @@ class Window(Gtk.ApplicationWindow):
         # Configure and add the status bar (Statusbar widget)
         self.status_bar.set_hexpand(True)
         self.status_bar.set_halign(Gtk.Align.START)
-
         # Attach to grid
         self.grid.attach(self.status_bar, 0, 3, 5, 1)
 
+    ### MANAGE SELECTION CHANGES
     def on_selection_changed(self, selection):
         model, paths = selection.get_selected_rows()
         num_selected = len(paths)  # Now this gives the correct count
         self.edit_btn.set_sensitive(num_selected == 1)
         self.delete_btn.set_sensitive(num_selected >= 1)
 
+    ### CSS PROVIDER
     def init_styling(self):
         self.root_dir = os.path.dirname(__file__)
         css_provider = Gtk.CssProvider()
