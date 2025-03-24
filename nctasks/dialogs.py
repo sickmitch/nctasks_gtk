@@ -183,7 +183,9 @@ def setup_dialog(missing, parent, refresh_callback):
     calendar_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "CALENDAR" not in missing:
         calendar_entry.set_text(os.getenv("CALENDAR"))
-    calendar_label = Gtk.Label(label="The calendar fetched to get tasks")
+    else:     
+        calendar_entry.set_placeholder_text("lower case only")
+    calendar_label = Gtk.Label(label="The calendar fetched to get tasks,only lower case")
     calendar_entry.set_size_request(250, -1)
     grid.attach(calendar_label, 0, 4, 1, 1)
     grid.attach(calendar_entry, 1, 4, 1, 1)

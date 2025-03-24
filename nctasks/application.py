@@ -57,7 +57,7 @@ class Application(Gtk.Application):
         todo.add('dtstamp', datetime.now())
         # Create a Calendar instance and add the Todo
         cal = Calendar()
-        cal.add('prodid', '-//My Calendar App//')
+        cal.add('prodid', '-//NCTasks//')
         cal.add('version', '2.0')
         cal.add_component(todo)
         # Generate the .ics data
@@ -101,7 +101,7 @@ class Application(Gtk.Application):
             uids_to_remove.append(uid_to_remove)
         # Construct the URLs for the tasks to delete
         for uid in uids_to_remove:
-            event_url = f"{self.cal_url}/{uid}.ics"
+            event_url = f"{self.cal_url}/{uid}.ics" ### Change here to fix browser created tasks (TODO)
             try:
                 # Send a DELETE request to the server
                 response = requests.delete(

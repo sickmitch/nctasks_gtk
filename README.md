@@ -21,6 +21,9 @@ If you get errors on runtime and find out missing dependencies please PR to this
   ### Find available calendars :<br />
     `curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'`
 
+## Known problems
+  - [ ] Can't manage activities created on the browser view (they create the url without relation to UID, need to adapt)
+  - [ ] Tasks with same summary, totally or a part of it, gets confused and will be picked up the first met from top in the tasks file
 
 ## To implement: <br />
  - [x] New Task <br />

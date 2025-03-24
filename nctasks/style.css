@@ -29,6 +29,18 @@
         background-color: #0b2e42; 
     }
 
+    /* combobox popover contents scrolledwindow {
+        text-decoration: none;
+    } */
+
+    combobox popover contents scrolledwindow viewport stack box modelbutton{
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+    combobox popover contents scrolledwindow viewport stack box modelbutton:hover{
+        background-color: #0b2e42; 
+    }
+
     treeview {
         background-color: #1e1e1e; 
         border-radius: 4px;
