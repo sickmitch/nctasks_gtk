@@ -23,8 +23,15 @@ class Application(Gtk.Application):
         self.window.present()
         self.load_environment_vars()
 
+    ### ADD BUTTON STACK HANDLER
+    def stack_handler(self, action):
+        if action == "add":
+            self.on_add_clicked()
+        if action == "edit":
+            self.on_edit_conclusion()
+        
     ### ADD BUTTON HANDLER
-    def on_add_clicked(self, button):
+    def on_add_clicked(self):
         # Fetch values from UI
         task = self.window.task_entry.get_text()
         status_text = self.window.status_combo.get_active_text()
@@ -82,7 +89,7 @@ class Application(Gtk.Application):
         self.window.task_entry.set_text('')
         self.window.status_combo.set_active(0)
         self.window.priority_combo.set_active(0)
-        self.window.stack.set_visible_child_name("icon")  # Show date view
+        self.window.due_stack.set_visible_child_name("icon")
         self.start_async_fetch()
     
     ### SYNC BUTTON HANDLER
@@ -125,31 +132,25 @@ class Application(Gtk.Application):
         selection = self.window.treeview.get_selection()
         model, paths = selection.get_selected_rows()
         # Check number of selected items
-        num_selected = len(paths)
         treeiter = model.get_iter(paths[0])
         uid = model[treeiter][0]
         # Find the VTODO component
         todo = None
         for component in self.cal.walk():
             if component.name == 'VTODO' and str(component.get('uid')) == uid:
-                todo = component
+                self.todo = component
                 break
-        if not todo:
-            error_dialog("Task not found!")
-            return
         # Get current values
-        self.current_summary = str(todo.get('summary', ''))
-        current_status = str(todo.get('status', 'NEEDS-ACTION'))
-        current_priority = int(todo.get('priority', 9))
-        current_due = todo.get('due')
-        # Map status to UI labels (unchanged)
-        status_map = {'NEEDS-ACTION': 'Todo', 'IN-PROCESS': 'Started', 'COMPLETED': 'Completed'}
+        self.current_summary = str(self.todo.get('summary', ''))
+        current_status = str(self.todo.get('status', 'NEEDS-ACTION'))
+        current_priority = int(self.todo.get('priority', 9))
+        current_due = self.todo.get('due')
+        # Map combos to index
+        status_map = {'NEEDS-ACTION': 0, 'IN-PROCESS': 1}
         self.current_status_label = status_map.get(current_status, 'Todo')
-        # Map priority to UI labels (unchanged)
-        priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
+        priority_map = {1: 2, 5: 1, 9: 0}
         self.current_priority_label = priority_map.get(current_priority, 'Low')
         # Parse due date 
-        current_due_date = None
         if current_due != None:
             due_dt = current_due.dt
             if isinstance(due_dt, datetime):
@@ -158,67 +159,70 @@ class Application(Gtk.Application):
                 self.current_due_date = due_dt
         else:
             self.current_due_date = current_due
-        create_edit_dialog(
-            parent=self.window,
-            current_summary=self.current_summary,
-            current_status_label=self.current_status_label,
-            current_priority_label=self.current_priority_label,
-            current_due_date=self.current_due_date,
-            todo=todo,
-            cal_url=self.cal_url,
-            user=self.user,
-            api_key=self.api_key,
-            refresh_callback=self.start_async_fetch)
 
-    ### HANDLE EDIT TASK NEW VALUES
-    def handle_edit_response(summary_entry, status_combo, priority_combo, due_button,
-                            todo, cal_url, user, api_key, refresh_callback):
-        # define new Todo values
-        new_summary = summary_entry.get_text()
-        status_idx = status_combo.get_active()
-        new_status_label = status_combo.get_model()[status_idx][0] if status_idx != -1 else ""
-        priority_idx = priority_combo.get_active()
-        new_priority_label = priority_combo.get_model()[priority_idx][0] if priority_idx != -1 else ""
-        # Map back to iCalendar values
-        status_reverse_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS", "Completed": "COMPLETED"}
-        new_status = status_reverse_map.get(new_status_label, 'NEEDS-ACTION')
-        priority_reverse_map = {'Low': 9, 'Medium': 5, 'High': 1}
-        new_priority = priority_reverse_map.get(new_priority_label, 9)
-        # Various DUE cases handling
-        if hasattr(due_button, 'selected_date'):
-            new_due_str = due_button.selected_date
-        else:
-            new_due_str = "Not Set"
-        if new_due_str != "Not Set":
-            try:
-                new_due_str = datetime.strptime(new_due_str, "%d-%m-%Y").date()
-            except Exception as e:
-                print(f"Error parsing date: {e}")
+        if self.current_due_date:
+            date_obj = datetime.strptime(str(self.current_due_date), "%Y-%m-%d")
+            formatted_date = date_obj.strftime("%d-%m-%Y")
+            self.window.due_button.selected_date = date_obj.date()
+            self.window.date_label.set_text(formatted_date)
+            self.window.due_stack.set_visible_child_name("date")
+
+        self.window.task_entry.set_text(self.current_summary)
+        self.window.status_combo.set_active(self.current_status_label)
+        self.window.priority_combo.set_active(self.current_priority_label)
+        self.window.add_stack.set_visible_child_name("edit")
+        
+    def on_edit_conclusion(self):
+        task = self.window.task_entry.get_text()
+        status_text = self.window.status_combo.get_active_text()
+        priority_text = self.window.priority_combo.get_active_text()        
+        if not task:
+            error_dialog("! Tasks needs a summary !")
+            return
+        # Map to right format
+        status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
+        status = status_map.get(status_text, "NEEDS-ACTION")
+        priority_map = {"Low": 9, "Medium": 5, "High": 1}
+        priority = priority_map.get(priority_text, 9)
         # Update the VTODO component
-        todo['summary'] = new_summary
-        todo['status'] = new_status
-        todo['priority'] = new_priority
-        if new_due_str != "Not Set":                         #### ugly but works
-            todo.add('due', new_due_str)
-        elif 'due' in todo:
-            del todo['due']
+        self.todo['summary'] = task
+        self.todo['status'] = status
+        self.todo['priority'] = priority
+        # Handle no due 
+        if hasattr(self.window.due_button, 'selected_date'):
+            new_task_due = self.window.due_button.selected_date
+        else:
+            new_task_due = "None"
+        if new_task_due != "None":
+            del self.todo['due']
+            new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
+            self.todo.add('due', new_task_due)
+        elif 'due' in self.todo:
+            del self.todo['due']
         # Prepare and send PUT request
         cal = Calendar()
         cal.add('prodid', '-//NCTasks//')
         cal.add('version', '2.0')
-        cal.add_component(todo)
+        cal.add_component(self.todo)
         try:
-            event_url = f"{cal_url}/{todo['uid']}.ics"
+            event_url = f"{self.cal_url}/{self.todo['uid']}.ics"
             response = requests.put(
                 event_url,
                 headers={'Content-Type': 'text/calendar; charset=utf-8'},
-                auth=HTTPBasicAuth(user, api_key),
+                auth=HTTPBasicAuth(self.user, self.api_key),
                 data=cal.to_ical()
             )
             response.raise_for_status()
-            refresh_callback()
         except Exception as e:
             raise Exception(f"API error: {str(e)}")
+        
+        # Reset input fields
+        self.window.task_entry.set_text('')
+        self.window.status_combo.set_active(0)
+        self.window.priority_combo.set_active(0)
+        self.window.due_stack.set_visible_child_name("icon")
+        self.window.add_stack.set_visible_child_name("add")
+        self.start_async_fetch()
 
     ### LOAD UP ENV AND CHECK FOR MISSING, IF SOMETHING MISSING TRIGGER SETUP
     def load_environment_vars(self):

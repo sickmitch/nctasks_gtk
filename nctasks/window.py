@@ -36,14 +36,6 @@ class Window(Gtk.ApplicationWindow):
             xalign=0.5  
         )
         input_box.append(self.task_entry)
-        #STATUS
-        self.status_combo = Gtk.ComboBoxText()
-        for status in ["Todo", "Started"]:
-            self.status_combo.append_text(status)
-        self.status_combo.set_active(0)
-        status_renderer = self.status_combo.get_cells()[0]
-        status_renderer.set_property("xalign", 0.5)
-        input_box.append(self.status_combo)
         #PRIO
         self.priority_combo = Gtk.ComboBoxText()
         for priority in ["Low", "Medium", "High"]:
@@ -52,23 +44,48 @@ class Window(Gtk.ApplicationWindow):
         priority_renderer = self.priority_combo.get_cells()[0]
         priority_renderer.set_property("xalign", 0.5)
         input_box.append(self.priority_combo)
+        #STATUS
+        self.status_combo = Gtk.ComboBoxText()
+        for status in ["Todo", "Started"]:
+            self.status_combo.append_text(status)
+        self.status_combo.set_active(0)
+        status_renderer = self.status_combo.get_cells()[0]
+        status_renderer.set_property("xalign", 0.5)
+        input_box.append(self.status_combo)
         # DUE
         self.due_button = Gtk.Button()
         self.due_button.set_size_request(110, -1)
-        self.stack = Gtk.Stack()
-        self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)  # Optional animation        
+        self.due_stack = Gtk.Stack()
+        self.due_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)  # Optional animation        
         icon = Gtk.Image.new_from_icon_name("org.gnome.Calendar")
         self.date_label = Gtk.Label()
-        self.stack.add_named(icon, "icon")
-        self.stack.add_named(self.date_label, "date")
-        self.stack.set_visible_child_name("icon")  # Initial state
-        self.due_button.set_child(self.stack)
-        self.due_button.connect("clicked", on_due_date_clicked, self.due_button, self.stack, self.date_label)
+        self.due_stack.add_named(icon, "icon")
+        self.due_stack.add_named(self.date_label, "date")
+        self.due_stack.set_visible_child_name("icon")  # Initial state
+        self.due_button.set_child(self.due_stack)
+        self.due_button.connect("clicked", on_due_date_clicked, self.due_button, self.due_stack, self.date_label)
         input_box.append(self.due_button)
-        # ADD
-        self.add_btn = Gtk.Button(label="Add Task", icon_name="list-add-symbolic")
-        self.add_btn.connect("clicked", self.app.on_add_clicked)
-        input_box.append(self.add_btn)
+        # ADD/EDIT
+        self.add_button = Gtk.Button()
+        self.add_button.set_size_request(80, -1)
+        self.add_stack = Gtk.Stack()
+        self.add_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)  # Optional animation        
+        add = Gtk.Image.new_from_icon_name("list-add-symbolic")
+        edit = Gtk.Image.new_from_icon_name("edit-symbolic")
+        self.add_stack.add_named(add, "add")
+        self.add_stack.add_named(edit, "edit")
+        self.add_stack.set_visible_child_name("add")  # Initial state
+        self.add_button.set_child(self.add_stack)
+        self.add_button.connect("clicked", self.on_stack_clicked, self.add_stack)
+        input_box.append(self.add_button)
+    
+    def on_stack_clicked(self, widget, stack):
+        active=stack.get_visible_child_name()
+        if active == "add":
+            self.action="add"
+        else:
+            self.action="edit"
+        self.app.stack_handler(self.action)
 
     def create_task_list(self):
         self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
