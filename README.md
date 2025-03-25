@@ -1,7 +1,5 @@
 # NCTasks
 
-https://github.com/user-attachments/assets/6dd00f36-06ed-4e76-b883-425d2790b94e
-
 To use this: 1) clone the repo 2) run the entrypoint that is tasks.py 3) fill in setup. To update just pull the repo. <br />
 **BE CAREFULL** it's very early in development so backup your calendars before using it, if you don't know [this](https://codeberg.org/BernieO/calcardbackup) can be very usefull.<br />
 Do not use if the calendar MUST be preserved, I can't ensure on results.

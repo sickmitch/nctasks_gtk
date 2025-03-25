@@ -10,7 +10,7 @@ import requests
 import threading
 import os
 import uuid
-from .dialogs import create_edit_dialog, error_dialog, setup_dialog
+from .dialogs import error_dialog, setup_dialog
 
 class Application(Gtk.Application):
     def __init__(self):
