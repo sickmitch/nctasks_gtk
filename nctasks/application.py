@@ -10,6 +10,7 @@ import requests
 import threading
 import os
 import uuid
+from urllib.parse import urlparse, urljoin
 from .dialogs import error_dialog, setup_dialog
 
 class Application(Gtk.Application):
@@ -96,19 +97,68 @@ class Application(Gtk.Application):
     def on_sync_clicked(self, button):
         self.start_async_fetch()
     
+    ### HREF EXTRACT 
+    def extract_uid_to_href(self):
+        try:
+            tree = ET.parse(self.ics_file)
+        except ET.ParseError as e:
+            raise ValueError(f"Failed to parse XML file: {e}")
+    
+        root = tree.getroot()
+        namespaces = {
+            'd': 'DAV:',
+            'cal': 'urn:ietf:params:xml:ns:caldav'
+        }
+        uid_to_href = {}
+
+        for response in root.findall('d:response', namespaces):
+            href_element = response.find('d:href', namespaces)
+            if href_element is None:
+                continue
+            href = href_element.text.strip()
+
+            propstat = response.find('d:propstat', namespaces)
+            if propstat is None:
+                continue
+            prop = propstat.find('d:prop', namespaces)
+            if prop is None:
+                continue
+            calendar_data_element = prop.find('cal:calendar-data', namespaces)
+            if calendar_data_element is None or not calendar_data_element.text:
+                continue
+
+            uid_in_cal = None
+            for line in calendar_data_element.text.splitlines():
+                line = line.strip()
+                if line.startswith('UID:'):
+                    uid_in_cal = line.split(':', 1)[1].strip()
+                    break
+            if uid_in_cal:
+                uid_to_href[uid_in_cal] = href
+        return uid_to_href
+    
     ### DELETE BUTTON HANDLER
     def on_del_clicked(self, button):
         selection = self.window.treeview.get_selection()
         model, paths = selection.get_selected_rows()
-        # Collect all UIDs to remove
-        uids_to_remove = []
-        for path in paths:
-            treeiter = model.get_iter(path)
-            uid_to_remove = model[treeiter][0]  # Get the UID of the selected task
-            uids_to_remove.append(uid_to_remove)
-        # Construct the URLs for the tasks to delete
+        uids_to_remove = [model[model.get_iter(path)][0] for path in paths]
+
+        try:
+            uid_to_href = self.extract_uid_to_href()
+        except ValueError as e:
+            error_dialog(str(e))
+            return
+
+        parsed_cal_url = urlparse(self.cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+
         for uid in uids_to_remove:
-            event_url = f"{self.cal_url}/{uid}.ics" ### Change here to fix browser created tasks (TODO)
+            event_href = uid_to_href.get(uid)
+            if not event_href:
+                error_dialog(f"No URL found for task with UID {uid}")
+                continue
+
+            event_url = urljoin(server_base, event_href)
             try:
                 # Send a DELETE request to the server
                 response = requests.delete(
@@ -133,11 +183,11 @@ class Application(Gtk.Application):
         model, paths = selection.get_selected_rows()
         # Check number of selected items
         treeiter = model.get_iter(paths[0])
-        uid = model[treeiter][0]
+        self.uid = model[treeiter][0]
         # Find the VTODO component
         todo = None
         for component in self.cal.walk():
-            if component.name == 'VTODO' and str(component.get('uid')) == uid:
+            if component.name == 'VTODO' and str(component.get('uid')) == self.uid:
                 self.todo = component
                 break
         # Get current values
@@ -186,8 +236,8 @@ class Application(Gtk.Application):
         priority = priority_map.get(priority_text, 9)
         # Update the VTODO component
         self.todo['summary'] = task
-        self.todo['status'] = status
         self.todo['priority'] = priority
+        self.todo['status'] = status
         # Handle no due 
         if hasattr(self.window.due_button, 'selected_date'):
             new_task_due = self.window.due_button.selected_date
@@ -195,7 +245,8 @@ class Application(Gtk.Application):
             new_task_due = "None"
         if new_task_due != "None":
             del self.todo['due']
-            new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
+            if isinstance(new_task_due, str):
+                new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
             self.todo.add('due', new_task_due)
         elif 'due' in self.todo:
             del self.todo['due']
@@ -204,8 +255,14 @@ class Application(Gtk.Application):
         cal.add('prodid', '-//NCTasks//')
         cal.add('version', '2.0')
         cal.add_component(self.todo)
+
+        uid_to_href = self.extract_uid_to_href()
+        event_href = uid_to_href.get(self.uid)
+        parsed_cal_url = urlparse(self.cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+
         try:
-            event_url = f"{self.cal_url}/{self.todo['uid']}.ics"
+            event_url = urljoin(server_base, event_href)
             response = requests.put(
                 event_url,
                 headers={'Content-Type': 'text/calendar; charset=utf-8'},

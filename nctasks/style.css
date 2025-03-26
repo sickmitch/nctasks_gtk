@@ -7,18 +7,20 @@
 
     entry {
         color: #dfe6ec;
-        min-height: 30px;  /* Direct height control */
-        padding: 0 5px;     /* Horizontal padding only */
-        margin: 5px;          /* Remove external spacing */
+        min-height: 30px; 
+        padding: 0 5px;   
+        margin: 5px;      
         font-family: 'JetBrains Mono', monospace;
+        border-radius: 15px;
     }
     
     button {
         color: #dfe6ec;
-        min-height: 30px;   /* Match entry height */
-        padding: 5px;       /* Uniform padding */
+        min-height: 30px; 
+        padding: 5px;     
         margin: 5px;
         font-family: 'JetBrains Mono', monospace;
+        border-radius: 15px;
     }
 
     entry{
@@ -29,13 +31,9 @@
         background-color: #0b2e42; 
     }
 
-    /* combobox popover contents scrolledwindow {
-        text-decoration: none;
-    } */
-
     combobox popover contents scrolledwindow viewport stack box modelbutton{
         font-family: 'JetBrains Mono', monospace;
-      }
+    }
 
     combobox popover contents scrolledwindow viewport stack box modelbutton:hover{
         background-color: #0b2e42; 
@@ -56,6 +54,12 @@
         background-color: #2c9fb5;
         color: black;
     }
+
+    treeview column-header {
+        padding-left: 100px;
+        padding-right: 10px;
+    }
+
 
     scrolledwindow {
         background-color: #1e1e1e; 

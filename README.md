@@ -42,3 +42,4 @@ If you get errors on runtime and find out missing dependencies please PR to this
    - [ ] Collapse secondary tasks
    - [ ] Add options button for setup dialog
    - [ ] Overall consistency
+ - [ ] In app settings (defaults, server, ui, ...)

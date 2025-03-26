@@ -7,7 +7,7 @@ class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("NCTasks")
-        self.set_size_request(625, 500)  
+        self.set_size_request(750, 500)  
         self.app = app
         self.grid = Gtk.Grid(
             column_spacing=5,
@@ -38,7 +38,7 @@ class Window(Gtk.ApplicationWindow):
         input_box.append(self.task_entry)
         #PRIO
         self.priority_combo = Gtk.ComboBoxText()
-        for priority in ["Low", "Medium", "High"]:
+        for priority in ["Priority", "Low", "Medium", "High"]:
             self.priority_combo.append_text(priority)
         self.priority_combo.set_active(0)
         priority_renderer = self.priority_combo.get_cells()[0]
@@ -46,7 +46,7 @@ class Window(Gtk.ApplicationWindow):
         input_box.append(self.priority_combo)
         #STATUS
         self.status_combo = Gtk.ComboBoxText()
-        for status in ["Todo", "Started"]:
+        for status in ["Status", "Todo", "Started"]:
             self.status_combo.append_text(status)
         self.status_combo.set_active(0)
         status_renderer = self.status_combo.get_cells()[0]
@@ -89,23 +89,27 @@ class Window(Gtk.ApplicationWindow):
 
     def create_task_list(self):
         self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
-        self.app.task_list = Gtk.ListStore(str, str, str, str, str)  # UID, Task, Priority, Status, Due
+        self.app.task_list = Gtk.ListStore(str, str, str, str, str)
         self.treeview = Gtk.TreeView(model=self.app.task_list)
+        self.treeview.set_column_spacing(10) 
         # Enable multiple selection
         selection = self.treeview.get_selection()
         selection.set_mode(Gtk.SelectionMode.MULTIPLE)
         selection.connect("changed", self.on_selection_changed)
         # Configure columns
         columns = [
-            ("Task", 1),
-            ("Priority", 2),
-            ("Status", 3),
-            ("Due", 4)
+            ("Task", 1, True),
+            ("Priority", 2, False),
+            ("Status", 3, False),
+            ("Due", 4, False)
         ]
-        for i, (title, col_id) in enumerate(columns):
+        for i, (title, col_id, expand) in enumerate(columns):
             renderer = Gtk.CellRendererText()
             column = Gtk.TreeViewColumn(title, renderer, text=col_id)
+            column.set_expand(expand)  # Allow only "Task" to expand
+            column.set_resizable(True)  # Allow resizing manually
             self.treeview.append_column(column)
+        self.treeview.set_headers_visible(False)
         self.scrolled_window.set_child(self.treeview)
         self.grid.attach(self.scrolled_window, 0, 1, 5, 1)
 
@@ -132,13 +136,14 @@ class Window(Gtk.ApplicationWindow):
         self.delete_btn.connect("clicked", self.app.on_del_clicked)
         self.delete_btn.set_sensitive(False)
         btn_box.append(self.delete_btn)
-        ##EDIT BUTTON
-        image_refresh = Gtk.Image.new_from_icon_name("document-open-symbolic")
+        ##EDIT BUTTONEdit Selected
+        ##SECONDARY TASK BUTTON
+        image_refresh = Gtk.Image.new_from_icon_name("document-save-symbolic")
         image_refresh.set_pixel_size(16)
         self.edit_btn = Gtk.Button.new()
         btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         btn_content.append(image_refresh)
-        btn_content.append(Gtk.Label(label="Edit Selected"))
+        btn_content.append(Gtk.Label(label="Add Secondary Task"))
         self.edit_btn.set_child(btn_content)  
         self.edit_btn.connect("clicked", self.app.on_edit_clicked)
         self.edit_btn.set_sensitive(False)
