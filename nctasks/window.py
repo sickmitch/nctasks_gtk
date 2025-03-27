@@ -202,9 +202,19 @@ class Window(Gtk.ApplicationWindow):
         btn_content.append(image_refresh)
         btn_content.append(Gtk.Label(label="Add Secondary Task"))
         self.secondary_btn.set_child(btn_content)  
-        self.secondary_btn.connect("clicked", self.app.on_secondary_clicked)
+        self.secondary_btn.connect("clicked", self.app.reset_input)
         self.secondary_btn.set_sensitive(False)
         btn_box.append(self.secondary_btn)
+        ##SECONDARY TASK BUTTON
+        image_refresh = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
+        image_refresh.set_pixel_size(16)
+        self.reset_btn = Gtk.Button.new()
+        btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        btn_content.append(image_refresh)
+        btn_content.append(Gtk.Label(label="Reset"))
+        self.reset_btn.set_child(btn_content)  
+        self.reset_btn.connect("clicked", self.app.reset_input)
+        btn_box.append(self.reset_btn)
         self.grid.attach(btn_box, 0, 2, 5, 1)
 
     ### STATUS BAR

@@ -56,7 +56,7 @@ class Application(Gtk.Application):
         todo.add('status', status)
         todo.add('priority', priority)
         todo.add('dtstamp', datetime.now())
-        if self.is_secondary == "True":
+        if hasattr(self, 'is_secondary'):
             todo.add('related-to', self.parent_uid)
         # Create a Calendar instance and add the Todo
         cal = Calendar()
@@ -228,6 +228,7 @@ class Application(Gtk.Application):
         self.reset_input()
         self.start_async_fetch()
 
+    ### UI STATE
     def set_ui_state(self, busy, status=None):
         self.window.spinner.set_visible(busy)
         self.window.sync_btn.set_sensitive(not busy)
@@ -310,7 +311,7 @@ class Application(Gtk.Application):
         return uid_to_href
     
     ###RESET INPUT FIELDS
-    def reset_input(self):
+    def reset_input(self, *_):
         self.window.task_entry.set_text('')
         self.window.status_combo.set_active(0)
         self.window.priority_combo.set_active(0)
