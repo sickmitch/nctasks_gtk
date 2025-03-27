@@ -207,13 +207,21 @@ class Window(Gtk.ApplicationWindow):
         btn_box.append(self.secondary_btn)
         self.grid.attach(btn_box, 0, 2, 5, 1)
 
+    ### STATUS BAR
     def create_status_bar(self):
         self.status_bar = Gtk.Statusbar()
-        # Configure and add the status bar (Statusbar widget)
+        self.spinner = Gtk.Spinner()
+        self.status_container = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, 
+            spacing=5
+        )
+        # Append widgets to the Box
+        self.status_container.append(self.spinner)
+        self.status_container.append(self.status_bar)
+        # Configure expand properties
+        self.spinner.set_hexpand(False)
         self.status_bar.set_hexpand(True)
-        self.status_bar.set_halign(Gtk.Align.START)
-        # Attach to grid
-        self.grid.attach(self.status_bar, 0, 3, 5, 1)
+        self.grid.attach(self.status_container, 0, 3, 5, 1)
 
     ### CSS PROVIDER
     def init_styling(self):

@@ -228,6 +228,18 @@ class Application(Gtk.Application):
         self.reset_input()
         self.start_async_fetch()
 
+    def set_ui_state(self, busy, status=None):
+        self.window.spinner.set_visible(busy)
+        self.window.sync_btn.set_sensitive(not busy)
+        
+        if busy:
+            self.window.spinner.start()
+        else:
+            self.window.spinner.stop()
+            
+        if status:
+            self.window.status_bar.push(0, status)
+
     ### SECONDARY BUTTON HANDLER
     def on_secondary_clicked(self, button):
         self.reset_input()
@@ -353,7 +365,7 @@ ROOT_DIR="{root_dir}"
 
     ### ASYNC FETCH
     def start_async_fetch(self):
-        self.window.status_bar.push(0, "  Calling Nextcloud server.....")
+        self.set_ui_state(busy=True, status="Connecting to Nextcloud...")
         threading.Thread(target=self.fetch_caldav_data, daemon=True).start()
 
     ### FETCHING
@@ -395,7 +407,7 @@ ROOT_DIR="{root_dir}"
             error_message = f"Unexpected error: {str(e)}"
             GLib.idle_add(error_dialog, error_message)
         finally:
-            self.window.status_bar.push(0, "󰪩  Successfully synchronized at "+ datetime.now().strftime("%H:%M:%S"))
+            GLib.idle_add(self.set_ui_state, False, ("Last sync at " + datetime.now().strftime("%H:%M")))
 
     ### LOAD NEW DATA AND UPDATE UI
     def update_calendar_data(self):
