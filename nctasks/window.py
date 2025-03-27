@@ -1,6 +1,6 @@
 from gi import require_versions
 require_versions({"Gtk": "4.0", "Adw": "1"})
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, GObject, Gio, Pango
 import os
 
 class Window(Gtk.ApplicationWindow):
@@ -71,13 +71,15 @@ class Window(Gtk.ApplicationWindow):
         self.add_stack = Gtk.Stack()
         self.add_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)  # Optional animation        
         add = Gtk.Image.new_from_icon_name("list-add-symbolic")
-        edit = Gtk.Image.new_from_icon_name("edit-symbolic")
+        edit = Gtk.Image.new_from_icon_name("document-send-symbolic")
         self.add_stack.add_named(add, "add")
         self.add_stack.add_named(edit, "edit")
         self.add_stack.set_visible_child_name("add")  # Initial state
         self.add_button.set_child(self.add_stack)
         self.add_button.connect("clicked", self.on_stack_clicked, self.add_stack)
         input_box.append(self.add_button)
+        ## Is here cos add_stack need to be defined before
+        self.task_entry.connect("activate", self.on_stack_clicked, self.add_stack)
     
     def on_stack_clicked(self, widget, stack):
         active=stack.get_visible_child_name()
@@ -87,31 +89,76 @@ class Window(Gtk.ApplicationWindow):
             self.action="edit"
         self.app.stack_handler(self.action)
 
+    # Create a custom list item class to hold task data
+    class TaskObject(GObject.Object):
+        __gtype_name__ = 'TaskObject'
+        uid = GObject.Property(type=str)
+        task = GObject.Property(type=str)
+        priority = GObject.Property(type=str)
+        status = GObject.Property(type=str)
+        due = GObject.Property(type=str)
+
     def create_task_list(self):
         self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
-        self.app.task_list = Gtk.ListStore(str, str, str, str, str)
-        self.treeview = Gtk.TreeView(model=self.app.task_list)
-        self.treeview.set_column_spacing(10) 
-        # Enable multiple selection
-        selection = self.treeview.get_selection()
-        selection.set_mode(Gtk.SelectionMode.MULTIPLE)
-        selection.connect("changed", self.on_selection_changed)
-        # Configure columns
+        self.app.task_list = Gio.ListStore(item_type=self.TaskObject)
+
+        # Create ColumnView with multi-selection
+        self.column_view = Gtk.ColumnView(
+            model=Gtk.MultiSelection.new(self.app.task_list),
+            show_row_separators=True,
+            show_column_separators=True
+        )
+
+        # Create columns with spacing
         columns = [
-            ("Task", 1, True),
-            ("Priority", 2, False),
-            ("Status", 3, False),
-            ("Due", 4, False)
+            ("Task", "task", True),
+            ("Priority", "priority", False),
+            ("Status", "status", False),
+            ("Due", "due", False)
         ]
-        for i, (title, col_id, expand) in enumerate(columns):
-            renderer = Gtk.CellRendererText()
-            column = Gtk.TreeViewColumn(title, renderer, text=col_id)
-            column.set_expand(expand)  # Allow only "Task" to expand
-            column.set_resizable(True)  # Allow resizing manually
-            self.treeview.append_column(column)
-        self.treeview.set_headers_visible(False)
-        self.scrolled_window.set_child(self.treeview)
+
+        for title, property_name, expand in columns:
+            # Create column with title
+            column = Gtk.ColumnViewColumn(title=None)
+
+            # Create factory for cell renderers
+            factory = Gtk.SignalListItemFactory()
+            factory.connect("setup", self._on_factory_setup)
+            factory.connect("bind", self._on_factory_bind(property_name))
+
+            column.set_factory(factory)
+            column.set_expand(expand)
+            column.set_resizable(True)
+            self.column_view.append_column(column)
+
+        # Configure selection
+        self.column_view.get_model().connect("selection-changed", self.on_selection_changed)
+
+
+        table_header: Gtk.ListItemWidget = self.column_view.get_first_child()
+        table_header.set_visible(False)
+
+        self.scrolled_window.set_child(self.column_view)
         self.grid.attach(self.scrolled_window, 0, 1, 5, 1)
+
+    def _on_factory_setup(self, factory, list_item):
+        label = Gtk.Label(xalign=0)  # Align text to left
+        label.set_ellipsize(Pango.EllipsizeMode.END)  # Prevent text overflow
+        list_item.set_child(label)
+
+    def _on_factory_bind(self, property_name):
+        def bind_handler(factory, list_item):
+            label = list_item.get_child()
+            obj = list_item.get_item()
+            label.set_text(obj.get_property(property_name) or "")
+        return bind_handler
+
+    def on_selection_changed(self, selection, position, n_items):
+        num_selected = selection.get_selection().get_size()  # Use get_size() for Bitset
+
+        self.edit_btn.set_sensitive(num_selected == 1)
+        self.secondary_btn.set_sensitive(num_selected == 1)
+        self.delete_btn.set_sensitive(num_selected >= 1)
 
     def create_action_buttons(self):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
@@ -136,18 +183,28 @@ class Window(Gtk.ApplicationWindow):
         self.delete_btn.connect("clicked", self.app.on_del_clicked)
         self.delete_btn.set_sensitive(False)
         btn_box.append(self.delete_btn)
-        ##EDIT BUTTONEdit Selected
-        ##SECONDARY TASK BUTTON
-        image_refresh = Gtk.Image.new_from_icon_name("document-save-symbolic")
+        ##EDIT BUTTON
+        image_refresh = Gtk.Image.new_from_icon_name("document-edit-symbolic")
         image_refresh.set_pixel_size(16)
         self.edit_btn = Gtk.Button.new()
         btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         btn_content.append(image_refresh)
-        btn_content.append(Gtk.Label(label="Add Secondary Task"))
+        btn_content.append(Gtk.Label(label="Edit Task"))
         self.edit_btn.set_child(btn_content)  
         self.edit_btn.connect("clicked", self.app.on_edit_clicked)
         self.edit_btn.set_sensitive(False)
         btn_box.append(self.edit_btn)
+        ##SECONDARY TASK BUTTON
+        image_refresh = Gtk.Image.new_from_icon_name("document-save-symbolic")
+        image_refresh.set_pixel_size(16)
+        self.secondary_btn = Gtk.Button.new()
+        btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        btn_content.append(image_refresh)
+        btn_content.append(Gtk.Label(label="Add Secondary Task"))
+        self.secondary_btn.set_child(btn_content)  
+        self.secondary_btn.connect("clicked", self.app.on_secondary_clicked)
+        self.secondary_btn.set_sensitive(False)
+        btn_box.append(self.secondary_btn)
         self.grid.attach(btn_box, 0, 2, 5, 1)
 
     def create_status_bar(self):
@@ -157,13 +214,6 @@ class Window(Gtk.ApplicationWindow):
         self.status_bar.set_halign(Gtk.Align.START)
         # Attach to grid
         self.grid.attach(self.status_bar, 0, 3, 5, 1)
-
-    ### MANAGE SELECTION CHANGES
-    def on_selection_changed(self, selection):
-        model, paths = selection.get_selected_rows()
-        num_selected = len(paths)  # Now this gives the correct count
-        self.edit_btn.set_sensitive(num_selected == 1)
-        self.delete_btn.set_sensitive(num_selected >= 1)
 
     ### CSS PROVIDER
     def init_styling(self):

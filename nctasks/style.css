@@ -39,27 +39,23 @@
         background-color: #0b2e42; 
     }
 
-    treeview {
+    columnview{
         background-color: #1e1e1e; 
         border-radius: 4px;
-        font-family: 'JetBrains Mono', monospace;
     }
 
-    treeview:hover {
-        background-color: #1e1e1e; 
+    columnview listview{
+        font-weight: 400;
     }
 
-    treeview:selected {
-        border-radius: 0px;
+    columnview listview row:selected {
         background-color: #2c9fb5;
         color: black;
     }
 
-    treeview column-header {
-        padding-left: 100px;
-        padding-right: 10px;
-    }
-
+    /* columnview listview row:hover {
+        background-color: #0b2e42; 
+    } */
 
     scrolledwindow {
         background-color: #1e1e1e; 

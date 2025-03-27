@@ -24,13 +24,6 @@ class Application(Gtk.Application):
         self.window.present()
         self.load_environment_vars()
 
-    ### ADD BUTTON STACK HANDLER
-    def stack_handler(self, action):
-        if action == "add":
-            self.on_add_clicked()
-        if action == "edit":
-            self.on_edit_conclusion()
-        
     ### ADD BUTTON HANDLER
     def on_add_clicked(self):
         # Fetch values from UI
@@ -44,7 +37,7 @@ class Application(Gtk.Application):
             new_task_due = "None"
         # Handle empty summary entry
         if not task:
-            error_dialog("! Tasks needs a summary !")
+            error_dialog(self.window, "! Tasks needs a summary !")
             return
         # Map to right format
         status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
@@ -63,6 +56,8 @@ class Application(Gtk.Application):
         todo.add('status', status)
         todo.add('priority', priority)
         todo.add('dtstamp', datetime.now())
+        if self.is_secondary == "True":
+            todo.add('related-to', self.parent_uid)
         # Create a Calendar instance and add the Todo
         cal = Calendar()
         cal.add('prodid', '-//NCTasks//')
@@ -84,7 +79,7 @@ class Application(Gtk.Application):
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            error_dialog(f"Failed to add task to server: {e}")
+            error_dialog(self.window, f"Failed to add task to server: {e}")
             return
         # Reset input fields and update the task list
         self.window.task_entry.set_text('')
@@ -97,6 +92,171 @@ class Application(Gtk.Application):
     def on_sync_clicked(self, button):
         self.start_async_fetch()
     
+    ### DELETE BUTTON HANDLER
+    def on_del_clicked(self, button):
+        uids_to_remove = self.get_selection()
+
+        try:
+            uid_to_href = self.extract_uid_to_href()
+        except ValueError as e:
+            error_dialog(self.window, str(e))
+            return
+
+        parsed_cal_url = urlparse(self.cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+
+        for uid in uids_to_remove:
+            event_href = uid_to_href.get(uid)
+            if not event_href:
+                error_dialog(self.window, f"No URL found for task with UID {uid}")
+                continue
+
+            event_url = urljoin(server_base, event_href)
+            try:
+                # Send a DELETE request to the server
+                response = requests.delete(
+                    url=event_url,
+                    auth=HTTPBasicAuth(self.user, self.api_key))
+                response.raise_for_status() 
+                # Remove the task from the local calendar
+                for component in self.cal.subcomponents:
+                    if component.name == 'VTODO' and str(component.get('uid')) == uid:
+                        self.cal.subcomponents.remove(component)
+                        break
+                self.window.status_bar.push(0, "Task successfully deleted from server")
+            except requests.exceptions.RequestException as e:
+                error_dialog(self.window, f"Failed to delete task from server: {e}")
+        # Save the updated calendar and refresh the task list
+        self.start_async_fetch()
+    
+    ### EDIT BUTTON HANDLER
+    def on_edit_clicked(self, button): 
+        self.reset_input()
+        self.uid = self.get_selection()[0]
+        # Find the VTODO component
+        todo = None
+        for component in self.cal.walk():
+            if component.name == 'VTODO' and str(component.get('uid')) == self.uid:
+                self.todo = component
+                break
+        # Get current values
+        self.current_summary = str(self.todo.get('summary', ''))
+        current_status = str(self.todo.get('status', 'NEEDS-ACTION'))
+        current_priority = int(self.todo.get('priority', 9))
+        current_due = self.todo.get('due')
+        # Map combos to index
+        status_map = {'NEEDS-ACTION': 0, 'IN-PROCESS': 1}
+        self.current_status_label = status_map.get(current_status, 'Todo')
+        priority_map = {1: 2, 5: 1, 9: 0}
+        self.current_priority_label = priority_map.get(current_priority, 'Low')
+        # Parse due date 
+        if current_due != None:
+            due_dt = current_due.dt
+            if isinstance(due_dt, datetime):
+                self.current_due_date = due_dt.date()
+            elif isinstance(due_dt, date):
+                self.current_due_date = due_dt
+        else:
+            self.current_due_date = current_due
+
+        if self.current_due_date:
+            date_obj = datetime.strptime(str(self.current_due_date), "%Y-%m-%d")
+            formatted_date = date_obj.strftime("%d-%m-%Y")
+            self.window.due_button.selected_date = date_obj.date()
+            self.window.date_label.set_text(formatted_date)
+            self.window.due_stack.set_visible_child_name("date")
+
+        self.window.task_entry.set_text(self.current_summary)
+        self.window.status_combo.set_active(self.current_status_label)
+        self.window.priority_combo.set_active(self.current_priority_label)
+        self.window.add_stack.set_visible_child_name("edit")
+        self.window.set_focus(self.window.task_entry)
+        
+    def on_edit_conclusion(self):
+        task = self.window.task_entry.get_text()
+        status_text = self.window.status_combo.get_active_text()
+        priority_text = self.window.priority_combo.get_active_text()        
+        if not task:
+            error_dialog(self.window, "! Tasks needs a summary !")
+            return
+        # Map to right format
+        status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
+        status = status_map.get(status_text, "NEEDS-ACTION")
+        priority_map = {"Low": 9, "Medium": 5, "High": 1}
+        priority = priority_map.get(priority_text, 9)
+        # Update the VTODO component
+        self.todo['summary'] = task
+        self.todo['priority'] = priority
+        self.todo['status'] = status
+        # Handle no due 
+        if hasattr(self.window.due_button, 'selected_date'):
+            new_task_due = self.window.due_button.selected_date
+        else:
+            new_task_due = "None"
+        if new_task_due != "None":
+            if 'due' in self.todo:
+                del self.todo['due']
+            if isinstance(new_task_due, str):
+                new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
+            self.todo.add('due', new_task_due)
+        elif 'due' in self.todo:
+            del self.todo['due']
+        # Prepare and send PUT request
+        cal = Calendar()
+        cal.add('prodid', '-//NCTasks//')
+        cal.add('version', '2.0')
+        cal.add_component(self.todo)
+
+        uid_to_href = self.extract_uid_to_href()
+        event_href = uid_to_href.get(self.uid)
+        parsed_cal_url = urlparse(self.cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+
+        try:
+            event_url = urljoin(server_base, event_href)
+            response = requests.put(
+                event_url,
+                headers={'Content-Type': 'text/calendar; charset=utf-8'},
+                auth=HTTPBasicAuth(self.user, self.api_key),
+                data=cal.to_ical()
+            )
+            response.raise_for_status()
+        except Exception as e:
+            raise Exception(f"API error: {str(e)}")
+        
+        # Reset input fields
+        self.reset_input()
+        self.start_async_fetch()
+
+    ### SECONDARY BUTTON HANDLER
+    def on_secondary_clicked(self, button):
+        self.reset_input()
+        self.is_secondary = "True"
+        self.window.add_stack.set_visible_child_name("add")
+        self.window.set_focus(self.window.task_entry)
+        self.parent_uid = self.get_selection()[0]
+
+    ### ADD BUTTON STACK HANDLer
+    def stack_handler(self, action):
+        if action == "add":
+            self.on_add_clicked()
+        if action == "edit":
+            self.on_edit_conclusion()
+        
+    ### GET SELECTION FROM COLUMNVIEW
+    def get_selection(self):
+        selection = self.window.column_view.get_model()  # Get MultiSelection model
+        bitset = selection.get_selection()  # Get selected rows as a Bitset
+        uids_to_remove = []
+
+        for i in range(bitset.get_size()):
+            index = bitset.get_nth(i)  # Get the index of the selected item
+            item = selection.get_item(index)  # Retrieve the TaskObject
+            if item:
+                uids_to_remove.append(item.uid)  # Store the UID for removal
+
+        return uids_to_remove
+
     ### HREF EXTRACT 
     def extract_uid_to_href(self):
         try:
@@ -137,149 +297,13 @@ class Application(Gtk.Application):
                 uid_to_href[uid_in_cal] = href
         return uid_to_href
     
-    ### DELETE BUTTON HANDLER
-    def on_del_clicked(self, button):
-        selection = self.window.treeview.get_selection()
-        model, paths = selection.get_selected_rows()
-        uids_to_remove = [model[model.get_iter(path)][0] for path in paths]
-
-        try:
-            uid_to_href = self.extract_uid_to_href()
-        except ValueError as e:
-            error_dialog(str(e))
-            return
-
-        parsed_cal_url = urlparse(self.cal_url)
-        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
-
-        for uid in uids_to_remove:
-            event_href = uid_to_href.get(uid)
-            if not event_href:
-                error_dialog(f"No URL found for task with UID {uid}")
-                continue
-
-            event_url = urljoin(server_base, event_href)
-            try:
-                # Send a DELETE request to the server
-                response = requests.delete(
-                    url=event_url,
-                    auth=HTTPBasicAuth(self.user, self.api_key))
-                response.raise_for_status() 
-                # Remove the task from the local calendar
-                for component in self.cal.subcomponents:
-                    if component.name == 'VTODO' and str(component.get('uid')) == uid:
-                        self.cal.subcomponents.remove(component)
-                        break
-                self.window.status_bar.push(0, "Task successfully deleted from server")
-            except requests.exceptions.RequestException as e:
-                error_dialog(f"Failed to delete task from server: {e}")
-        # Save the updated calendar and refresh the task list
-        self.start_async_fetch()
-    
-    ### EDIT BUTTON HANDLER
-    def on_edit_clicked(self, button): 
-        # Get selected rows from TreeView's selection
-        selection = self.window.treeview.get_selection()
-        model, paths = selection.get_selected_rows()
-        # Check number of selected items
-        treeiter = model.get_iter(paths[0])
-        self.uid = model[treeiter][0]
-        # Find the VTODO component
-        todo = None
-        for component in self.cal.walk():
-            if component.name == 'VTODO' and str(component.get('uid')) == self.uid:
-                self.todo = component
-                break
-        # Get current values
-        self.current_summary = str(self.todo.get('summary', ''))
-        current_status = str(self.todo.get('status', 'NEEDS-ACTION'))
-        current_priority = int(self.todo.get('priority', 9))
-        current_due = self.todo.get('due')
-        # Map combos to index
-        status_map = {'NEEDS-ACTION': 0, 'IN-PROCESS': 1}
-        self.current_status_label = status_map.get(current_status, 'Todo')
-        priority_map = {1: 2, 5: 1, 9: 0}
-        self.current_priority_label = priority_map.get(current_priority, 'Low')
-        # Parse due date 
-        if current_due != None:
-            due_dt = current_due.dt
-            if isinstance(due_dt, datetime):
-                self.current_due_date = due_dt.date()
-            elif isinstance(due_dt, date):
-                self.current_due_date = due_dt
-        else:
-            self.current_due_date = current_due
-
-        if self.current_due_date:
-            date_obj = datetime.strptime(str(self.current_due_date), "%Y-%m-%d")
-            formatted_date = date_obj.strftime("%d-%m-%Y")
-            self.window.due_button.selected_date = date_obj.date()
-            self.window.date_label.set_text(formatted_date)
-            self.window.due_stack.set_visible_child_name("date")
-
-        self.window.task_entry.set_text(self.current_summary)
-        self.window.status_combo.set_active(self.current_status_label)
-        self.window.priority_combo.set_active(self.current_priority_label)
-        self.window.add_stack.set_visible_child_name("edit")
-        
-    def on_edit_conclusion(self):
-        task = self.window.task_entry.get_text()
-        status_text = self.window.status_combo.get_active_text()
-        priority_text = self.window.priority_combo.get_active_text()        
-        if not task:
-            error_dialog("! Tasks needs a summary !")
-            return
-        # Map to right format
-        status_map = {"Todo": "NEEDS-ACTION", "Started": "IN-PROCESS"}
-        status = status_map.get(status_text, "NEEDS-ACTION")
-        priority_map = {"Low": 9, "Medium": 5, "High": 1}
-        priority = priority_map.get(priority_text, 9)
-        # Update the VTODO component
-        self.todo['summary'] = task
-        self.todo['priority'] = priority
-        self.todo['status'] = status
-        # Handle no due 
-        if hasattr(self.window.due_button, 'selected_date'):
-            new_task_due = self.window.due_button.selected_date
-        else:
-            new_task_due = "None"
-        if new_task_due != "None":
-            del self.todo['due']
-            if isinstance(new_task_due, str):
-                new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
-            self.todo.add('due', new_task_due)
-        elif 'due' in self.todo:
-            del self.todo['due']
-        # Prepare and send PUT request
-        cal = Calendar()
-        cal.add('prodid', '-//NCTasks//')
-        cal.add('version', '2.0')
-        cal.add_component(self.todo)
-
-        uid_to_href = self.extract_uid_to_href()
-        event_href = uid_to_href.get(self.uid)
-        parsed_cal_url = urlparse(self.cal_url)
-        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
-
-        try:
-            event_url = urljoin(server_base, event_href)
-            response = requests.put(
-                event_url,
-                headers={'Content-Type': 'text/calendar; charset=utf-8'},
-                auth=HTTPBasicAuth(self.user, self.api_key),
-                data=cal.to_ical()
-            )
-            response.raise_for_status()
-        except Exception as e:
-            raise Exception(f"API error: {str(e)}")
-        
-        # Reset input fields
+    ###RESET INPUT FIELDS
+    def reset_input(self):
         self.window.task_entry.set_text('')
         self.window.status_combo.set_active(0)
         self.window.priority_combo.set_active(0)
         self.window.due_stack.set_visible_child_name("icon")
         self.window.add_stack.set_visible_child_name("add")
-        self.start_async_fetch()
 
     ### LOAD UP ENV AND CHECK FOR MISSING, IF SOMETHING MISSING TRIGGER SETUP
     def load_environment_vars(self):
@@ -417,49 +441,52 @@ ROOT_DIR="{root_dir}"
             print(f"Error loading calendar data: {e}")
             return cal
     
-    ### PARSE AND ASSIGN THE TASK LIST
     def update_task_list(self):
         priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
         priority_sort_order = {'High': 3, 'Medium': 2, 'Low': 1, 'Not Set': 0}
         status_map = {'IN-PROCESS': 'Started', 'NEEDS-ACTION': 'Todo', 'COMPLETED': 'Completed'}
-        self.task_list.clear()
+
+        # Clear existing tasks
+        self.task_list.remove_all()
+
         tasks = []
         parent_to_children = {}
-        # First pass: collect all tasks and build parent-child relationships
+
+        # First pass: collect tasks and build parent-child mapping
         for component in self.cal.walk():
             if component.name == 'VTODO':
                 try:
                     uid = str(component.get('uid', ''))
                     task = str(component.get('summary', 'Untitled Task'))
-                    # Map priority to descriptive label
-                    priority_val = int(component.get('priority', '9999'))  # Default to "Not Set"
+
+                    # Map priority
+                    priority_val = int(component.get('priority', '9999'))  
                     priority = priority_map.get(priority_val, 'Not Set')
-                    # Map status to descriptive label
+
+                    # Map status
                     status_val = str(component.get('status', 'None'))
                     status = status_map.get(status_val, 'None')
-                    # Parse the due field
+
+                    # Parse due date
                     due = component.get('due')
                     if due:
                         if isinstance(due, str):
-                            # Handle string due dates
                             if 'T' in due:
-                                # Datetime format: DUE:20250318T235959
                                 due_date = datetime.strptime(due, '%Y%m%dT%H%M%S')
                             else:
-                                # Date format: DUE;VALUE=DATE:20250316
                                 due_date = datetime.strptime(due, '%Y%m%d')
                         else:
-                            # Handle datetime and date objects
                             due_date = due.dt
                             if isinstance(due_date, date) and not isinstance(due_date, datetime):
                                 due_date = datetime.combine(due_date, datetime.min.time(), timezone.utc)
-                            elif due_date.tzinfo is None:  # Convert naive datetime to UTC
+                            elif due_date.tzinfo is None:
                                 due_date = due_date.replace(tzinfo=timezone.utc)
                         due_str = due_date.strftime('󰥔   %a %d/%m H:%H')
                     else:
-                        due_date = datetime.max.replace(tzinfo=timezone.utc)  # Make datetime max timezone-aware
+                        due_date = datetime.max.replace(tzinfo=timezone.utc)
                         due_str = 'Not Set'
-                    # Check for RELATED-TO field
+
+                    # Check for parent-child relation
                     related_to = str(component.get('related-to', ''))
                     if related_to:
                         if related_to not in parent_to_children:
@@ -469,13 +496,18 @@ ROOT_DIR="{root_dir}"
                         tasks.append((uid, task, priority, status, due_str, due_date))
                 except Exception as e:
                     print(f"Error parsing task: {e}")
+
         # Sort tasks: first by due date (ascending), then by priority (descending)
         tasks.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
-        # Populate self.task_list with sorted tasks, ensuring children follow their parents
+
+        # Populate ListStore with sorted tasks, ensuring children follow parents
         for uid, task, priority, status, due_str, _ in tasks:
-            self.task_list.append([uid, task, priority, status, due_str])
+            task_obj = self.window.TaskObject(uid=uid, task=task, priority=priority, status=status, due=due_str)
+            self.task_list.append(task_obj)
+
             if uid in parent_to_children:
                 children = parent_to_children[uid]
                 children.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
                 for child_uid, child_task, child_priority, child_status, child_due_str, _ in children:
-                    self.task_list.append([child_uid, f" 󰳟   {child_task}", child_priority, child_status, child_due_str])
+                    child_task_obj = self.window.TaskObject(uid=child_uid, task=f" 󰳟   {child_task}", priority=child_priority, status=child_status, due=child_due_str)
+                    self.task_list.append(child_task_obj)

@@ -138,8 +138,9 @@ def setup_dialog(missing, parent, refresh_callback):
     dialog.grab_focus()
 
 #### ERROR MESSAGE
-def error_dialog(message):
+def error_dialog(parent, message):
     dialog = Gtk.MessageDialog(
+        transient_for=parent,
         modal=True,  
         buttons=Gtk.ButtonsType.CLOSE,
         message_type=Gtk.MessageType.ERROR,
