@@ -22,9 +22,10 @@ If you get errors on runtime and find out missing dependencies please PR to this
     `curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'`
 
 ## Known problems
-  - Tasks with same summary, totally or a part of it, gets confused and will be picked up the first met from top in the tasks file (to check)
+  - Deleting is behaving strangely, usually when bulk deleting 
 
 ## To implement: <br />
+ - [x] State Walker
  - [x] New Task <br />
  - [x] Add secondary tasks
  - [x] Task management <br />
@@ -37,7 +38,7 @@ If you get errors on runtime and find out missing dependencies please PR to this
  - [x] First use setup (WIP)<br />
  - [ ] Manage more then one calendar <br />
  - [ ] Graphical refinement<br />
-   - [ ] Toggle for excluding completed tasks
+   - [ ] Toggle for excluding completed tasks (now ever on)
    - [ ] Collapse secondary tasks
    - [ ] Add options button for setup dialog
    - [ ] Overall consistency

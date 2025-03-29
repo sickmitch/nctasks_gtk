@@ -1,13 +1,23 @@
 from gi import require_versions
 require_versions({"Gtk": "4.0", "Adw": "1"})
-from gi.repository import Gtk, Gdk, GObject, Gio, Pango
+from gi.repository import Gtk, Gdk, GObject, Gio, Pango, GLib
 import os
+
+    # Create a custom list item class to hold task data
+class TaskObject(GObject.Object):
+    __gtype_name__ = 'TaskObject'
+    uid = GObject.Property(type=str)
+    task = GObject.Property(type=str)
+    priority = GObject.Property(type=str)
+    status = GObject.Property(type=str)
+    due = GObject.Property(type=str)
+
 
 class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("NCTasks")
-        self.set_size_request(750, 500)  
+        self.set_size_request(700, 500)  
         self.app = app
         self.grid = Gtk.Grid(
             column_spacing=5,
@@ -80,7 +90,31 @@ class Window(Gtk.ApplicationWindow):
         input_box.append(self.add_button)
         ## Is here cos add_stack need to be defined before
         self.task_entry.connect("activate", self.on_stack_clicked, self.add_stack)
-    
+
+        self.initial_values = {
+            "task_entry": self.task_entry.get_text(),
+            "priority": self.priority_combo.get_active_text(),
+            "status": self.status_combo.get_active_text(),
+            "due": self.due_stack.get_visible_child_name(),
+        }
+        self.state_changed = False
+        # Start watcher function every 500ms
+        GLib.timeout_add(500, self.watch_for_changes)
+
+    def watch_for_changes(self):
+        current_values = {
+            "task_entry": self.task_entry.get_text(),
+            "priority": self.priority_combo.get_active_text(),
+            "status": self.status_combo.get_active_text(),
+            "due": self.due_stack.get_visible_child_name(),
+        }
+        if current_values != self.initial_values:
+            self.state_changed = True
+        else:
+            self.state_changed = False
+        self.reset_btn.set_visible(self.state_changed)
+        return True  # Keep the timer running
+
     def on_stack_clicked(self, widget, stack):
         active=stack.get_visible_child_name()
         if active == "add":
@@ -89,18 +123,10 @@ class Window(Gtk.ApplicationWindow):
             self.action="edit"
         self.app.stack_handler(self.action)
 
-    # Create a custom list item class to hold task data
-    class TaskObject(GObject.Object):
-        __gtype_name__ = 'TaskObject'
-        uid = GObject.Property(type=str)
-        task = GObject.Property(type=str)
-        priority = GObject.Property(type=str)
-        status = GObject.Property(type=str)
-        due = GObject.Property(type=str)
 
     def create_task_list(self):
         self.scrolled_window = Gtk.ScrolledWindow(hexpand=True, vexpand=True)
-        self.app.task_list = Gio.ListStore(item_type=self.TaskObject)
+        self.app.task_list = Gio.ListStore(item_type=TaskObject)
 
         # Create ColumnView with multi-selection
         self.column_view = Gtk.ColumnView(
@@ -134,7 +160,6 @@ class Window(Gtk.ApplicationWindow):
         # Configure selection
         self.column_view.get_model().connect("selection-changed", self.on_selection_changed)
 
-
         table_header: Gtk.ListItemWidget = self.column_view.get_first_child()
         table_header.set_visible(False)
 
@@ -150,71 +175,61 @@ class Window(Gtk.ApplicationWindow):
         def bind_handler(factory, list_item):
             label = list_item.get_child()
             obj = list_item.get_item()
-            label.set_text(obj.get_property(property_name) or "")
+            label_text = obj.get_property(property_name) or ""
+            label.set_text(label_text)
+
+            attr_list = Pango.AttrList()
+
+            if property_name == 'task':
+                priority = obj.get_property('priority')
+                if priority == 'High':
+                    attr = Pango.attr_weight_new(Pango.Weight.HEAVY)
+                    attr_list.insert(attr)
+
+            label.set_attributes(attr_list)
+
         return bind_handler
 
     def on_selection_changed(self, selection, position, n_items):
         num_selected = selection.get_selection().get_size()  # Use get_size() for Bitset
 
         self.edit_btn.set_sensitive(num_selected == 1)
+        self.edit_btn.set_visible(num_selected == 1)
         self.secondary_btn.set_sensitive(num_selected == 1)
+        self.secondary_btn.set_visible(num_selected == 1)
+        self.walker_btn.set_sensitive(num_selected >= 1)
+        self.walker_btn.set_visible(num_selected >= 1)
         self.delete_btn.set_sensitive(num_selected >= 1)
+        self.delete_btn.set_visible(num_selected >= 1)
 
     def create_action_buttons(self):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        ## SYNC BUTTON
-        image_refresh = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
-        image_refresh.set_pixel_size(16)
-        self.sync_btn = Gtk.Button.new()
-        btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        btn_content.append(image_refresh)
-        btn_content.append(Gtk.Label(label="Sync Now"))
-        self.sync_btn.set_child(btn_content)  
-        self.sync_btn.connect("clicked", self.app.on_sync_clicked)
-        btn_box.append(self.sync_btn)
-        ##REMOVE BUTTON
-        image_refresh = Gtk.Image.new_from_icon_name("edit-delete-symbolic")
-        image_refresh.set_pixel_size(16)
-        self.delete_btn = Gtk.Button.new()
-        btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        btn_content.append(image_refresh)
-        btn_content.append(Gtk.Label(label="Delete Selected"))
-        self.delete_btn.set_child(btn_content)  
-        self.delete_btn.connect("clicked", self.app.on_del_clicked)
-        self.delete_btn.set_sensitive(False)
-        btn_box.append(self.delete_btn)
-        ##EDIT BUTTON
-        image_refresh = Gtk.Image.new_from_icon_name("document-edit-symbolic")
-        image_refresh.set_pixel_size(16)
-        self.edit_btn = Gtk.Button.new()
-        btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        btn_content.append(image_refresh)
-        btn_content.append(Gtk.Label(label="Edit Task"))
-        self.edit_btn.set_child(btn_content)  
-        self.edit_btn.connect("clicked", self.app.on_edit_clicked)
-        self.edit_btn.set_sensitive(False)
-        btn_box.append(self.edit_btn)
-        ##SECONDARY TASK BUTTON
-        image_refresh = Gtk.Image.new_from_icon_name("document-save-symbolic")
-        image_refresh.set_pixel_size(16)
-        self.secondary_btn = Gtk.Button.new()
-        btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        btn_content.append(image_refresh)
-        btn_content.append(Gtk.Label(label="Add Secondary Task"))
-        self.secondary_btn.set_child(btn_content)  
-        self.secondary_btn.connect("clicked", self.app.reset_input)
-        self.secondary_btn.set_sensitive(False)
-        btn_box.append(self.secondary_btn)
-        ##SECONDARY TASK BUTTON
-        image_refresh = Gtk.Image.new_from_icon_name("view-refresh-symbolic")
-        image_refresh.set_pixel_size(16)
-        self.reset_btn = Gtk.Button.new()
-        btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        btn_content.append(image_refresh)
-        btn_content.append(Gtk.Label(label="Reset"))
-        self.reset_btn.set_child(btn_content)  
-        self.reset_btn.connect("clicked", self.app.reset_input)
-        btn_box.append(self.reset_btn)
+
+        # Helper function to create buttons with Unicode icons
+        def create_button(label, icon, callback, visible=True, sensitive=True):
+            icon_label = Gtk.Label(label=icon)
+            icon_label.set_margin_end(5)  # Add spacing
+
+            btn = Gtk.Button.new()
+            btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+            btn_content.append(icon_label)
+            btn_content.append(Gtk.Label(label=label))
+
+            btn.set_child(btn_content)
+            btn.connect("clicked", callback)
+            btn.set_visible(visible)
+            btn.set_sensitive(sensitive)
+            btn_box.append(btn)
+            return btn
+
+        # Create buttons with Unicode icons
+        self.sync_btn = create_button("Sync", "", self.app.on_sync_clicked)
+        self.delete_btn = create_button("Delete", "󰺝", self.app.on_del_clicked, visible=False, sensitive=False)
+        self.edit_btn = create_button("Edit", "", self.app.on_edit_clicked, visible=False, sensitive=False)
+        self.secondary_btn = create_button("Add Secondary", "󱞪", self.app.on_secondary_clicked, visible=False, sensitive=False)
+        self.reset_btn = create_button("Reset", "󰁯", self.app.reset_input, visible=False)
+        self.walker_btn = create_button("Progress", "", self.app.walker_clicked, visible=False)
+
         self.grid.attach(btn_box, 0, 2, 5, 1)
 
     ### STATUS BAR

@@ -1,6 +1,6 @@
 from gi import require_versions
 require_versions({"Gtk": "4.0", "Adw": "1"})
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib, Gdk
 from requests.auth import HTTPBasicAuth
 from icalendar import Calendar, Todo
 from datetime import datetime, timezone, date
@@ -12,12 +12,13 @@ import os
 import uuid
 from urllib.parse import urlparse, urljoin
 from .dialogs import error_dialog, setup_dialog
+from .window import TaskObject
 
 class Application(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="com.sickmitch.NCTasks")
         self.task_list = [] 
-
+        self.uid = []
     def do_activate(self):
         from .window import Window
         self.window = Window(self)
@@ -57,7 +58,17 @@ class Application(Gtk.Application):
         todo.add('priority', priority)
         todo.add('dtstamp', datetime.now())
         if hasattr(self, 'is_secondary'):
-            todo.add('related-to', self.parent_uid)
+            if self.is_secondary is True:
+                if len(self.parent_uid) != 1:
+                    if len(self.parent_uid) == 2 and self.parent_uid[0] == self.parent_uid[1]: ### managing a remenance coming from who knows where (TODO)
+                        error_dialog(self.window, f"Double parent equal managed")
+                        self.parent_uid = [self.parent_uid[0]]
+                if len(self.parent_uid) == 1:
+                    todo.add('related-to', self.parent_uid)
+                    self.is_secondary = False
+                    self.parent_uid.clear()
+                else:
+                    error_dialog(self.window, f"Something got wrong, check uids \r {self.parent_uid}")
         # Create a Calendar instance and add the Todo
         cal = Calendar()
         cal.add('prodid', '-//NCTasks//')
@@ -82,10 +93,7 @@ class Application(Gtk.Application):
             error_dialog(self.window, f"Failed to add task to server: {e}")
             return
         # Reset input fields and update the task list
-        self.window.task_entry.set_text('')
-        self.window.status_combo.set_active(0)
-        self.window.priority_combo.set_active(0)
-        self.window.due_stack.set_visible_child_name("icon")
+        self.reset_input()
         self.start_async_fetch()
     
     ### SYNC BUTTON HANDLER
@@ -107,9 +115,6 @@ class Application(Gtk.Application):
 
         for uid in uids_to_remove:
             event_href = uid_to_href.get(uid)
-            if not event_href:
-                error_dialog(self.window, f"No URL found for task with UID {uid}")
-                continue
 
             event_url = urljoin(server_base, event_href)
             try:
@@ -118,11 +123,6 @@ class Application(Gtk.Application):
                     url=event_url,
                     auth=HTTPBasicAuth(self.user, self.api_key))
                 response.raise_for_status() 
-                # Remove the task from the local calendar
-                for component in self.cal.subcomponents:
-                    if component.name == 'VTODO' and str(component.get('uid')) == uid:
-                        self.cal.subcomponents.remove(component)
-                        break
                 self.window.status_bar.push(0, "Task successfully deleted from server")
             except requests.exceptions.RequestException as e:
                 error_dialog(self.window, f"Failed to delete task from server: {e}")
@@ -131,10 +131,12 @@ class Application(Gtk.Application):
     
     ### EDIT BUTTON HANDLER
     def on_edit_clicked(self, button): 
+        self.window.add_stack.set_visible_child_name("edit")
         self.reset_input()
+        self.window.set_focus(self.window.task_entry)
         self.uid = self.get_selection()[0]
         # Find the VTODO component
-        todo = None
+        # todo = None
         for component in self.cal.walk():
             if component.name == 'VTODO' and str(component.get('uid')) == self.uid:
                 self.todo = component
@@ -145,9 +147,9 @@ class Application(Gtk.Application):
         current_priority = int(self.todo.get('priority', 9))
         current_due = self.todo.get('due')
         # Map combos to index
-        status_map = {'NEEDS-ACTION': 0, 'IN-PROCESS': 1}
+        status_map = {'NEEDS-ACTION': 1, 'IN-PROCESS': 2}  # need to index 1 over cos of first field being the description for the combo
+        priority_map = {1: 3, 5: 2, 9: 1}
         self.current_status_label = status_map.get(current_status, 'Todo')
-        priority_map = {1: 2, 5: 1, 9: 0}
         self.current_priority_label = priority_map.get(current_priority, 'Low')
         # Parse due date 
         if current_due != None:
@@ -207,7 +209,11 @@ class Application(Gtk.Application):
         cal.add('version', '2.0')
         cal.add_component(self.todo)
 
-        uid_to_href = self.extract_uid_to_href()
+        try:
+            uid_to_href = self.extract_uid_to_href()
+        except ValueError as e:
+            error_dialog(self.window, str(e))
+            return
         event_href = uid_to_href.get(self.uid)
         parsed_cal_url = urlparse(self.cal_url)
         server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
@@ -228,6 +234,70 @@ class Application(Gtk.Application):
         self.reset_input()
         self.start_async_fetch()
 
+    ### SECONDARY BUTTON HANDLER
+    def on_secondary_clicked(self, button):
+        self.reset_input()
+        if hasattr (self, 'parent_uid'):
+            self.parent_uid.clear()
+        self.is_secondary = True
+        self.window.add_stack.set_visible_child_name("add")
+        self.window.set_focus(self.window.task_entry)
+        self.parent_uid = self.get_selection()
+
+    ### WALKER BUTTON HANDLER
+    def walker_clicked(self, button):
+        self.uid = self.get_selection()[0]
+        # Find the VTODO component
+        for component in self.cal.walk():
+            if component.name == 'VTODO' and str(component.get('uid')) == self.uid:
+                todo = component
+                break
+
+        current_status = str(todo.get('status'))
+        if current_status == "NEEDS-ACTION":
+            status = "IN-PROCESS"
+        if current_status == "IN-PROCESS":
+            status = "COMPLETED"
+
+        todo['status'] = status
+
+        # Prepare and send PUT request
+        cal = Calendar()
+        cal.add('prodid', '-//NCTasks//')
+        cal.add('version', '2.0')
+        cal.add_component(todo)
+
+        try:
+            uid_to_href = self.extract_uid_to_href()
+        except ValueError as e:
+            error_dialog(self.window, str(e))
+            return
+        event_href = uid_to_href.get(self.uid)
+        parsed_cal_url = urlparse(self.cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+
+        try:
+            event_url = urljoin(server_base, event_href)
+            response = requests.put(
+                event_url,
+                headers={'Content-Type': 'text/calendar; charset=utf-8'},
+                auth=HTTPBasicAuth(self.user, self.api_key),
+                data=cal.to_ical()
+            )
+            response.raise_for_status()
+        except Exception as e:
+            raise Exception(f"API error: {str(e)}")
+        
+        self.start_async_fetch()
+
+
+    ### ADD BUTTON STACK HANDLER
+    def stack_handler(self, action):
+        if action == "add":
+            self.on_add_clicked()
+        if action == "edit":
+            self.on_edit_conclusion()
+        
     ### UI STATE
     def set_ui_state(self, busy, status=None):
         self.window.spinner.set_visible(busy)
@@ -241,34 +311,19 @@ class Application(Gtk.Application):
         if status:
             self.window.status_bar.push(0, status)
 
-    ### SECONDARY BUTTON HANDLER
-    def on_secondary_clicked(self, button):
-        self.reset_input()
-        self.is_secondary = "True"
-        self.window.add_stack.set_visible_child_name("add")
-        self.window.set_focus(self.window.task_entry)
-        self.parent_uid = self.get_selection()[0]
-
-    ### ADD BUTTON STACK HANDLer
-    def stack_handler(self, action):
-        if action == "add":
-            self.on_add_clicked()
-        if action == "edit":
-            self.on_edit_conclusion()
-        
     ### GET SELECTION FROM COLUMNVIEW
     def get_selection(self):
-        selection = self.window.column_view.get_model()  # Get MultiSelection model
-        bitset = selection.get_selection()  # Get selected rows as a Bitset
-        uids_to_remove = []
-
+        if not isinstance(self.uid, list):
+            self.uid = [self.uid]
+            self.uid.clear()
+        selection = self.window.column_view.get_model()  
+        bitset = selection.get_selection()  
         for i in range(bitset.get_size()):
-            index = bitset.get_nth(i)  # Get the index of the selected item
-            item = selection.get_item(index)  # Retrieve the TaskObject
+            index = bitset.get_nth(i) 
+            item = selection.get_item(index)
             if item:
-                uids_to_remove.append(item.uid)  # Store the UID for removal
-
-        return uids_to_remove
+                self.uid.append(item.uid) 
+        return self.uid
 
     ### HREF EXTRACT 
     def extract_uid_to_href(self):
@@ -312,11 +367,17 @@ class Application(Gtk.Application):
     
     ###RESET INPUT FIELDS
     def reset_input(self, *_):
+        try:
+            del self.window.due_button.selected_date
+        except AttributeError:
+            pass
         self.window.task_entry.set_text('')
         self.window.status_combo.set_active(0)
         self.window.priority_combo.set_active(0)
         self.window.due_stack.set_visible_child_name("icon")
         self.window.add_stack.set_visible_child_name("add")
+        if hasattr (self, 'parent_uid'):
+            self.parent_uid.clear()
 
     ### LOAD UP ENV AND CHECK FOR MISSING, IF SOMETHING MISSING TRIGGER SETUP
     def load_environment_vars(self):
@@ -480,6 +541,9 @@ ROOT_DIR="{root_dir}"
                     status_val = str(component.get('status', 'None'))
                     status = status_map.get(status_val, 'None')
 
+                    if status == 'Completed':
+                        continue  
+
                     # Parse due date
                     due = component.get('due')
                     if due:
@@ -515,12 +579,12 @@ ROOT_DIR="{root_dir}"
 
         # Populate ListStore with sorted tasks, ensuring children follow parents
         for uid, task, priority, status, due_str, _ in tasks:
-            task_obj = self.window.TaskObject(uid=uid, task=task, priority=priority, status=status, due=due_str)
+            task_obj = TaskObject(uid=uid, task=task, priority=priority, status=status, due=due_str)
             self.task_list.append(task_obj)
 
             if uid in parent_to_children:
                 children = parent_to_children[uid]
                 children.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
                 for child_uid, child_task, child_priority, child_status, child_due_str, _ in children:
-                    child_task_obj = self.window.TaskObject(uid=child_uid, task=f" 󰳟   {child_task}", priority=child_priority, status=child_status, due=child_due_str)
+                    child_task_obj = TaskObject(uid=child_uid, task=f" 󰳟   {child_task}", priority=child_priority, status=child_status, due=child_due_str)
                     self.task_list.append(child_task_obj)
