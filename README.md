@@ -19,7 +19,9 @@ If you get errors on runtime and find out missing dependencies please PR to this
    - Copy the unique key shown in a dialog **it will be seen only now** <br />
    - Paste the key into NCTasks's setup dialog
   ### Find available calendars :<br />
-    `curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'`
+  $BASE_URL should be in a "https://nextcloud.example.xyz/" format
+    curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'
+  
 
 ## Known problems
   - Deleting is behaving strangely, usually when bulk deleting 
