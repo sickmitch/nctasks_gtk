@@ -8,9 +8,9 @@ Do not use if the calendar MUST be preserved, I can't ensure on results.
 Tested only on Arch Linux for now, if you try on different platforms please report back.<br />
 If you get errors on runtime and find out missing dependencies please PR to this README, much appreciate. <br />
 
-    ```
-    sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar python-dotenv` 
-    ```
+```
+sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar python-dotenv` 
+```
 
 ## Setup Help
   ### Create API key in Nextcloud from browser<br />
@@ -23,7 +23,7 @@ If you get errors on runtime and find out missing dependencies please PR to this
   ### Find available calendars :<br />
   $BASE_URL should be in a "https://nextcloud.example.xyz/" format
   ```
-    curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'
+  curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'
   ```
 
 ## Known problems
