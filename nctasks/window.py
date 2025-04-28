@@ -22,10 +22,10 @@ class Window(Gtk.ApplicationWindow):
         self.grid = Gtk.Grid(
             column_spacing=5,
             row_spacing=5,
-            margin_start=15,
-            margin_end=15,
-            margin_top=15,
-            margin_bottom=15
+            margin_start=10,
+            margin_end=10,
+            margin_top=10,
+            margin_bottom=10
         )
         self.init_styling()
         self.create_input_fields()

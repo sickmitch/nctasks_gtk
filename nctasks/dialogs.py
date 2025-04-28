@@ -9,17 +9,39 @@ import webbrowser
 import os
 from dotenv import load_dotenv
 
-#### CALENDAR
+
 def on_due_date_clicked(button, due_button, stack, date_label):
-    #Define dialog
-    dialog = Gtk.Dialog(title="Select Due Date")
+    # Define dialog
+    dialog = Gtk.Dialog(title="Select Due Date and Time")
     dialog.set_transient_for(button.get_root())
     dialog.set_modal(True)
-    dialog.set_default_size(400, 200)
+    dialog.set_default_size(400, 300)
 
     calendar = Gtk.Calendar()
+    hour_spin = Gtk.SpinButton()
+    hour_spin.set_adjustment(Gtk.Adjustment(lower=0, upper=23, step_increment=1, page_increment=1))
+    minute_spin = Gtk.SpinButton()
+    minute_spin.set_adjustment(Gtk.Adjustment(lower=0, upper=50, step_increment=10, page_increment=1))
+
+    # Labels
+    time_label = Gtk.Label(label="Time (HH:MM)")
+    hour_label = Gtk.Label(label="Hour:")
+    minute_label = Gtk.Label(label="Minute:")
+
+    # Layout
     content_area = dialog.get_content_area()
-    content_area.append(calendar)   
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin_top=10, margin_bottom=10, margin_start=10, margin_end=10)
+    box.append(calendar)
+
+    time_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+    time_box.append(time_label)
+    time_box.append(hour_label)
+    time_box.append(hour_spin)
+    time_box.append(minute_label)
+    time_box.append(minute_spin)
+
+    box.append(time_box)
+    content_area.append(box)
 
     dialog.add_buttons(
         "Cancel", Gtk.ResponseType.CANCEL,
@@ -30,9 +52,10 @@ def on_due_date_clicked(button, due_button, stack, date_label):
     def on_date_response(dialog, response):
         if response == Gtk.ResponseType.OK:
             selected_date = calendar.get_date().format("%d-%m-%Y")
-            date_label.set_text(selected_date)
+            selected_time = f"{int(hour_spin.get_value()):02d}:{int(minute_spin.get_value()):02d}"
+            date_label.set_text(f"{selected_date} {selected_time}")
             stack.set_visible_child_name("date")  # Show date view
-            due_button.selected_date = selected_date
+            due_button.selected_date = f"{selected_date} {selected_time}"
         elif response == 42:  # Handle "Clear"
             stack.set_visible_child_name("icon")  # Show icon view
             if hasattr(due_button, 'selected_date'):
@@ -118,7 +141,8 @@ def setup_dialog(missing, parent, refresh_callback):
     def on_response(dialog, response_id):
         if response_id == Gtk.ResponseType.OK:
             from .application import Application
-            Application.handle_setup_response(
+            app = Application()
+            app.handle_setup_response(
                 url_entry.get_text(),
                 user_entry.get_text(), 
                 api_key_entry.get_text(), 

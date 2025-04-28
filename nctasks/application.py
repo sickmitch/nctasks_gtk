@@ -1,6 +1,6 @@
 from gi import require_versions
 require_versions({"Gtk": "4.0", "Adw": "1"})
-from gi.repository import Gtk, GLib, Gdk
+from gi.repository import Gtk, GLib
 from requests.auth import HTTPBasicAuth
 from icalendar import Calendar, Todo
 from datetime import datetime, timezone, date
@@ -52,7 +52,10 @@ class Application(Gtk.Application):
         todo.add('uid', uid)
         todo.add('summary', task)
         if new_task_due != "None":
-            new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
+            try:
+                new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y %H:%M")
+            except ValueError:
+                new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y")
             todo.add('due', new_task_due)
         todo.add('status', status)
         todo.add('priority', priority)
@@ -155,16 +158,19 @@ class Application(Gtk.Application):
         if current_due != None:
             due_dt = current_due.dt
             if isinstance(due_dt, datetime):
-                self.current_due_date = due_dt.date()
+                self.current_due_date = due_dt
             elif isinstance(due_dt, date):
                 self.current_due_date = due_dt
         else:
             self.current_due_date = current_due
 
         if self.current_due_date:
-            date_obj = datetime.strptime(str(self.current_due_date), "%Y-%m-%d")
-            formatted_date = date_obj.strftime("%d-%m-%Y")
-            self.window.due_button.selected_date = date_obj.date()
+            if isinstance(self.current_due_date, datetime):
+                formatted_date = self.current_due_date.strftime("%d-%m-%Y %H:%M")
+            else:
+                date_obj = datetime.strptime(str(self.current_due_date), "%Y-%m-%d")
+                formatted_date = date_obj.strftime("%d-%m-%Y")
+            self.window.due_button.selected_date = self.current_due_date
             self.window.date_label.set_text(formatted_date)
             self.window.due_stack.set_visible_child_name("date")
 
@@ -199,7 +205,10 @@ class Application(Gtk.Application):
             if 'due' in self.todo:
                 del self.todo['due']
             if isinstance(new_task_due, str):
-                new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y").date()
+                try:
+                    new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y %H:%M")
+                except ValueError:
+                    new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y")
             self.todo.add('due', new_task_due)
         elif 'due' in self.todo:
             del self.todo['due']
@@ -410,7 +419,7 @@ class Application(Gtk.Application):
             self.start_async_fetch()           
             
     ### HANDLE SETUP DIALOG VALUES
-    def handle_setup_response(url, user, api_key, calendar, root_dir, refresh_callback):
+    def handle_setup_response(self, url, user, api_key, calendar, root_dir, refresh_callback):
         module_dir = os.path.dirname(os.path.abspath(__file__))
         env_path = os.path.join(module_dir, '.env')
         # Write to .env
@@ -558,7 +567,7 @@ ROOT_DIR="{root_dir}"
                                 due_date = datetime.combine(due_date, datetime.min.time(), timezone.utc)
                             elif due_date.tzinfo is None:
                                 due_date = due_date.replace(tzinfo=timezone.utc)
-                        due_str = due_date.strftime('󰥔   %a %d/%m H:%H')
+                        due_str = due_date.strftime('󰥔  %a %d/%m %H:%M')
                     else:
                         due_date = datetime.max.replace(tzinfo=timezone.utc)
                         due_str = 'Not Set'
