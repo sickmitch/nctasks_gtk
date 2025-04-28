@@ -34,7 +34,7 @@ If you get errors on runtime and find out missing dependencies please PR to this
    - [x] Various fields managing <br />
       - [x] Remove due <br />
       - [x] Edit task <br />
-      - [ ] Due hour manage 
+      - [x] Due hour manage 
  - [x] First use setup (WIP)<br />
  - [ ] Manage more then one calendar <br />
  - [ ] Graphical refinement<br />
