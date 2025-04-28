@@ -9,7 +9,7 @@ Tested only on Arch Linux for now, if you try on different platforms please repo
 If you get errors on runtime and find out missing dependencies please PR to this README, much appreciate. <br />
 
 ```
-sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar python-dotenv` 
+sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar python-dotenv
 ```
 
 ## Setup Help
