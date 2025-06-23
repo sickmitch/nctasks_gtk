@@ -2,6 +2,7 @@ from gi import require_versions
 require_versions({"Gtk": "4.0", "Adw": "1"})
 from gi.repository import Gtk, Gdk, GObject, Gio, Pango, GLib
 import os
+import re
 
     # Create a custom list item class to hold task data
 class TaskObject(GObject.Object):
@@ -135,6 +136,9 @@ class Window(Gtk.ApplicationWindow):
             show_column_separators=True
         )
 
+        # Add double-click event handler
+        self.column_view.connect("activate", self.on_row_activated)
+
         # Create columns with spacing
         columns = [
             ("Task", "task", True),
@@ -167,8 +171,9 @@ class Window(Gtk.ApplicationWindow):
         self.grid.attach(self.scrolled_window, 0, 1, 5, 1)
 
     def _on_factory_setup(self, factory, list_item):
-        label = Gtk.Label(xalign=0)  # Align text to left
-        label.set_ellipsize(Pango.EllipsizeMode.END)  # Prevent text overflow
+        label = Gtk.Label(xalign=0)
+        label.set_ellipsize(Pango.EllipsizeMode.END)
+        label.set_use_markup(True)  # Enable markup
         list_item.set_child(label)
 
     def _on_factory_bind(self, property_name):
@@ -176,17 +181,29 @@ class Window(Gtk.ApplicationWindow):
             label = list_item.get_child()
             obj = list_item.get_item()
             label_text = obj.get_property(property_name) or ""
-            label.set_text(label_text)
-
-            attr_list = Pango.AttrList()
 
             if property_name == 'task':
-                priority = obj.get_property('priority')
-                if priority == 'High':
-                    attr = Pango.attr_weight_new(Pango.Weight.HEAVY)
-                    attr_list.insert(attr)
-
-            label.set_attributes(attr_list)
+                match = re.match(r"(\s*󰳟\s*)?(.*)", label_text)
+                if match:
+                    prefix = match.group(1) or ""
+                    summary = match.group(2) or ""
+                else:
+                    prefix = ""
+                    summary = label_text
+                # Determine markup for bold and underline independently
+                is_high_priority = hasattr(obj, 'priority') and obj.get_property('priority') == 'High'
+                is_collapsed = hasattr(obj, 'is_parent') and obj.is_parent and hasattr(obj, 'is_collapsed') and obj.is_collapsed
+                summary_markup = summary
+                if is_high_priority and is_collapsed:
+                    summary_markup = f'<u><b>{summary}</b></u>'
+                elif is_high_priority:
+                    summary_markup = f'<b>{summary}</b>'
+                elif is_collapsed:
+                    summary_markup = f'<u>{summary}</u>'
+                markup = f'{prefix}{summary_markup}'
+                label.set_markup(markup)
+            else:
+                label.set_text(label_text)
 
         return bind_handler
 
@@ -267,6 +284,12 @@ class Window(Gtk.ApplicationWindow):
         except Exception as e:
             print(f"Error loading CSS: {e}")
     
+    def on_row_activated(self, column_view, position):
+        # Get the activated item
+        model = column_view.get_model()
+        item = model.get_item(position)
+        if hasattr(item, 'is_parent') and item.is_parent:
+            self.app.toggle_collapse(item.uid)
 
 class MyApp(Gtk.Application):
 

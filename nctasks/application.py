@@ -19,6 +19,7 @@ class Application(Gtk.Application):
         super().__init__(application_id="com.sickmitch.NCTasks")
         self.task_list = [] 
         self.uid = []
+        self.collapsed_parents = set()  # Track collapsed parent UIDs
     def do_activate(self):
         from .window import Window
         self.window = Window(self)
@@ -635,8 +636,15 @@ ROOT_DIR="{root_dir}"
 
             task, name, priority, status, due_str, due_date, _ = tasks_by_uid[uid]
             indent = "  " * level + ("󰳟   " if level > 0 else "")
+            is_parent = uid in parent_to_children
+            is_collapsed = uid in self.collapsed_parents
             task_obj = TaskObject(uid=task, task=f"{indent}{name}", priority=priority, status=status, due=due_str)
+            task_obj.is_parent = is_parent
+            task_obj.is_collapsed = is_collapsed
             self.task_list.append(task_obj)
+
+            if is_parent and is_collapsed:
+                return  # Don't show children if collapsed
 
             children = parent_to_children.get(uid, [])
             children.sort(key=lambda cid: (tasks_by_uid[cid][5], -priority_sort_order[tasks_by_uid[cid][2]]))
@@ -647,4 +655,11 @@ ROOT_DIR="{root_dir}"
         roots.sort(key=lambda uid: (tasks_by_uid[uid][5], -priority_sort_order[tasks_by_uid[uid][2]]))
         for root_uid in roots:
             insert_task(root_uid, 0)
+
+    def toggle_collapse(self, uid):
+        if uid in self.collapsed_parents:
+            self.collapsed_parents.remove(uid)
+        else:
+            self.collapsed_parents.add(uid)
+        self.update_task_list()
     

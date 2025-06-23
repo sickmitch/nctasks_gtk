@@ -92,3 +92,7 @@
     spinbutton:hover {
         background-color: #0b2e42;
     }
+
+    .collapsed-parent {
+        text-decoration: underline;
+    }
