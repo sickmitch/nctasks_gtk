@@ -252,6 +252,13 @@ class Application(Gtk.Application):
         self.window.add_stack.set_visible_child_name("add")
         self.window.set_focus(self.window.task_entry)
         self.parent_uid = self.get_selection()
+        self.window.task_entry.set_placeholder_text("figlia di: " + self.get_task_summary_by_uid(self.parent_uid[0]))
+
+    ### GET TASK SUMMARY BY UID
+    def get_task_summary_by_uid(self, uid):
+        for component in self.cal.walk():
+            if component.name == 'VTODO' and str(component.get('uid')) == uid:
+                return str(component.get('summary'))
 
     ### WALKER BUTTON HANDLER
     def walker_clicked(self, button):
@@ -298,6 +305,48 @@ class Application(Gtk.Application):
             raise Exception(f"API error: {str(e)}")
         
         self.start_async_fetch()
+
+    ### COMPLETE BUTTON HANDLER
+    def complete_clicked(self, button):
+        self.uid = self.get_selection()[0]
+        # Find the VTODO component
+        for component in self.cal.walk():
+            if component.name == 'VTODO' and str(component.get('uid')) == self.uid:
+                todo = component
+                break
+        
+        status = "COMPLETED"
+        todo['status'] = status
+
+        # Prepare and send PUT request
+        cal = Calendar()
+        cal.add('prodid', '-//NCTasks//')
+        cal.add('version', '2.0')
+        cal.add_component(todo)
+
+        try:
+            uid_to_href = self.extract_uid_to_href()
+        except ValueError as e:
+            error_dialog(self.window, str(e))
+            return
+        event_href = uid_to_href.get(self.uid)
+        parsed_cal_url = urlparse(self.cal_url)
+        server_base = f"{parsed_cal_url.scheme}://{parsed_cal_url.netloc}"
+
+        try:
+            event_url = urljoin(server_base, event_href)
+            response = requests.put(
+                event_url,
+                headers={'Content-Type': 'text/calendar; charset=utf-8'},
+                auth=HTTPBasicAuth(self.user, self.api_key),
+                data=cal.to_ical()
+            )
+            response.raise_for_status()
+        except Exception as e:
+            raise Exception(f"API error: {str(e)}")
+        
+        self.start_async_fetch()
+
 
 
     ### ADD BUTTON STACK HANDLER
@@ -523,77 +572,79 @@ ROOT_DIR="{root_dir}"
         except Exception as e:
             print(f"Error loading calendar data: {e}")
             return cal
-    
+
     def update_task_list(self):
         priority_map = {1: 'High', 5: 'Medium', 9: 'Low'}
         priority_sort_order = {'High': 3, 'Medium': 2, 'Low': 1, 'Not Set': 0}
         status_map = {'IN-PROCESS': 'Started', 'NEEDS-ACTION': 'Todo', 'COMPLETED': 'Completed'}
 
-        # Clear existing tasks
         self.task_list.remove_all()
 
-        tasks = []
+        tasks_by_uid = {}
         parent_to_children = {}
+        roots = []
 
-        # First pass: collect tasks and build parent-child mapping
+        # Parse all VTODO components
         for component in self.cal.walk():
-            if component.name == 'VTODO':
-                try:
-                    uid = str(component.get('uid', ''))
-                    task = str(component.get('summary', 'Untitled Task'))
+            if component.name != 'VTODO':
+                continue
 
-                    # Map priority
-                    priority_val = int(component.get('priority', '9999'))  
-                    priority = priority_map.get(priority_val, 'Not Set')
+            try:
+                uid = str(component.get('uid', ''))
+                task = str(component.get('summary', 'Untitled Task'))
+                priority_val = int(component.get('priority', '9999'))
+                priority = priority_map.get(priority_val, 'Not Set')
+                status_val = str(component.get('status', 'None'))
+                status = status_map.get(status_val, 'None')
 
-                    # Map status
-                    status_val = str(component.get('status', 'None'))
-                    status = status_map.get(status_val, 'None')
+                if status == 'Completed':
+                    continue
 
-                    if status == 'Completed':
-                        continue  
-
-                    # Parse due date
-                    due = component.get('due')
-                    if due:
-                        if isinstance(due, str):
-                            if 'T' in due:
-                                due_date = datetime.strptime(due, '%Y%m%dT%H%M%S')
-                            else:
-                                due_date = datetime.strptime(due, '%Y%m%d')
-                        else:
-                            due_date = due.dt
-                            if isinstance(due_date, date) and not isinstance(due_date, datetime):
-                                due_date = datetime.combine(due_date, datetime.min.time(), timezone.utc)
-                            elif due_date.tzinfo is None:
-                                due_date = due_date.replace(tzinfo=timezone.utc)
-                        due_str = due_date.strftime('󰥔  %a %d/%m %H:%M')
+                due = component.get('due')
+                if due:
+                    if isinstance(due, str):
+                        due_date = datetime.strptime(due, '%Y%m%dT%H%M%S') if 'T' in due else datetime.strptime(due, '%Y%m%d')
                     else:
-                        due_date = datetime.max.replace(tzinfo=timezone.utc)
-                        due_str = 'Not Set'
+                        due_date = due.dt
+                        if isinstance(due_date, date) and not isinstance(due_date, datetime):
+                            due_date = datetime.combine(due_date, datetime.min.time(), timezone.utc)
+                        elif due_date.tzinfo is None:
+                            due_date = due_date.replace(tzinfo=timezone.utc)
+                    due_str = due_date.strftime('󰥔  %a %d/%m %H:%M')
+                else:
+                    due_date = datetime.max.replace(tzinfo=timezone.utc)
+                    due_str = 'Not Set'
 
-                    # Check for parent-child relation
-                    related_to = str(component.get('related-to', ''))
-                    if related_to:
-                        if related_to not in parent_to_children:
-                            parent_to_children[related_to] = []
-                        parent_to_children[related_to].append((uid, task, priority, status, due_str, due_date))
-                    else:
-                        tasks.append((uid, task, priority, status, due_str, due_date))
-                except Exception as e:
-                    print(f"Error parsing task: {e}")
+                related_to = str(component.get('related-to', ''))
 
-        # Sort tasks: first by due date (ascending), then by priority (descending)
-        tasks.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
+                task_info = (uid, task, priority, status, due_str, due_date, related_to)
+                tasks_by_uid[uid] = task_info
 
-        # Populate ListStore with sorted tasks, ensuring children follow parents
-        for uid, task, priority, status, due_str, _ in tasks:
-            task_obj = TaskObject(uid=uid, task=task, priority=priority, status=status, due=due_str)
+                if related_to:
+                    parent_to_children.setdefault(related_to, []).append(uid)
+                else:
+                    roots.append(uid)
+
+            except Exception as e:
+                print(f"Error parsing task: {e}")
+
+        # Recursive insertion
+        def insert_task(uid, level):
+            if uid not in tasks_by_uid:
+                return
+
+            task, name, priority, status, due_str, due_date, _ = tasks_by_uid[uid]
+            indent = "  " * level + ("󰳟   " if level > 0 else "")
+            task_obj = TaskObject(uid=task, task=f"{indent}{name}", priority=priority, status=status, due=due_str)
             self.task_list.append(task_obj)
 
-            if uid in parent_to_children:
-                children = parent_to_children[uid]
-                children.sort(key=lambda x: (x[5], -priority_sort_order[x[2]]))
-                for child_uid, child_task, child_priority, child_status, child_due_str, _ in children:
-                    child_task_obj = TaskObject(uid=child_uid, task=f" 󰳟   {child_task}", priority=child_priority, status=child_status, due=child_due_str)
-                    self.task_list.append(child_task_obj)
+            children = parent_to_children.get(uid, [])
+            children.sort(key=lambda cid: (tasks_by_uid[cid][5], -priority_sort_order[tasks_by_uid[cid][2]]))
+            for child_uid in children:
+                insert_task(child_uid, level + 1)
+
+        # Sort roots and begin recursion
+        roots.sort(key=lambda uid: (tasks_by_uid[uid][5], -priority_sort_order[tasks_by_uid[uid][2]]))
+        for root_uid in roots:
+            insert_task(root_uid, 0)
+    

@@ -17,7 +17,7 @@ class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
         self.set_title("NCTasks")
-        self.set_size_request(700, 500)  
+        self.set_size_request(750, 500)  
         self.app = app
         self.grid = Gtk.Grid(
             column_spacing=5,
@@ -198,6 +198,8 @@ class Window(Gtk.ApplicationWindow):
         self.secondary_btn.set_sensitive(num_selected == 1)
         self.secondary_btn.set_visible(num_selected == 1)
         self.walker_btn.set_sensitive(num_selected >= 1)
+        self.complete_btn.set_visible(num_selected >= 1)
+        self.complete_btn.set_sensitive(num_selected >= 1)
         self.walker_btn.set_visible(num_selected >= 1)
         self.delete_btn.set_sensitive(num_selected >= 1)
         self.delete_btn.set_visible(num_selected >= 1)
@@ -229,6 +231,7 @@ class Window(Gtk.ApplicationWindow):
         self.secondary_btn = create_button("Add Secondary", "󱞪", self.app.on_secondary_clicked, visible=False, sensitive=False)
         self.reset_btn = create_button("Reset", "󰁯", self.app.reset_input, visible=False)
         self.walker_btn = create_button("Progress", "", self.app.walker_clicked, visible=False)
+        self.complete_btn = create_button("Complete", "", self.app.complete_clicked, visible=False)
 
         self.grid.attach(btn_box, 0, 2, 5, 1)
 
