@@ -1,7 +1,7 @@
     /* Material Design styling */
 
     :root {
-        --border-radius: 20px;
+        --border-radius: 10px;
     }
 
     window {
@@ -12,22 +12,30 @@
 
     entry {
         color: #dfe6ec;
-        min-height: 30px; 
-        padding: 0 5px;   
-        margin: 5px;      
+        min-height: 22px;
+        padding: 0 3px;
+        margin: 2px;
         font-family: 'JetBrains Mono', monospace;
         border-radius: var(--border-radius);
     }
     
     button {
         color: #dfe6ec;
-        min-height: 30px; 
-        padding: 5px;     
-        margin: 5px;
+        min-height: 22px;
+        padding: 3px;
+        margin: 2px;
         font-family: 'JetBrains Mono', monospace;
         border-radius: var(--border-radius);
     }
 
+    combobox {
+        min-height: 22px;
+        padding: 0 3px;
+        margin: 2px;
+        font-family: 'JetBrains Mono', monospace;
+        border-radius: var(--border-radius);
+    }
+    
     entry{
         font-weight: 600;
     }
@@ -60,11 +68,6 @@
         font-weight: 400;
     }
 
-    columnview listview row:selected {
-        background-color: #2c9fb5;
-        color: black;
-    }
-
     columnview listview row:hover {
         background-color: #0b2e42; 
     }
@@ -73,7 +76,7 @@
         background-color: #1e1e1e; 
         border: 2px solid #2c9fb5;
         font-weight: 350;
-        border-radius: var(--border-radius);
+        border-radius: calc(var(--border-radius) + 4px);
         font-family: 'JetBrains Mono', monospace;
     }
 
@@ -83,9 +86,9 @@
 
     spinbutton {
         border-radius: var(--border-radius);
-        min-height: 30px;
-        padding: 0 5px;
-        margin: 5px;
+        min-height: 22px;
+        padding: 0 3px;
+        margin: 2px;
         font-family: 'JetBrains Mono', monospace;
     }
 

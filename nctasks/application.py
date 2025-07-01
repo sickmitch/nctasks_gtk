@@ -20,6 +20,7 @@ class Application(Gtk.Application):
         self.task_list = [] 
         self.uid = []
         self.collapsed_parents = set()  # Track collapsed parent UIDs
+        self.first_load = True  # Track if this is the first load
     def do_activate(self):
         from .window import Window
         self.window = Window(self)
@@ -32,6 +33,7 @@ class Application(Gtk.Application):
         task = self.window.task_entry.get_text()
         status_text = self.window.status_combo.get_active_text()
         priority_text = self.window.priority_combo.get_active_text()        
+        description = self.window.description_entry.get_text() if hasattr(self.window, 'description_entry') else ""
         # Handle no due 
         if hasattr(self.window.due_button, 'selected_date'):
             new_task_due = self.window.due_button.selected_date
@@ -52,6 +54,8 @@ class Application(Gtk.Application):
         todo = Todo()
         todo.add('uid', uid)
         todo.add('summary', task)
+        if description:
+            todo.add('description', description)
         if new_task_due != "None":
             try:
                 new_task_due = datetime.strptime(new_task_due, "%d-%m-%Y %H:%M")
@@ -147,6 +151,7 @@ class Application(Gtk.Application):
                 break
         # Get current values
         self.current_summary = str(self.todo.get('summary', ''))
+        self.current_description = str(self.todo.get('description', ''))
         current_status = str(self.todo.get('status', 'NEEDS-ACTION'))
         current_priority = int(self.todo.get('priority', 9))
         current_due = self.todo.get('due')
@@ -176,6 +181,8 @@ class Application(Gtk.Application):
             self.window.due_stack.set_visible_child_name("date")
 
         self.window.task_entry.set_text(self.current_summary)
+        if hasattr(self.window, 'description_entry'):
+            self.window.description_entry.set_text(self.current_description)
         self.window.status_combo.set_active(self.current_status_label)
         self.window.priority_combo.set_active(self.current_priority_label)
         self.window.add_stack.set_visible_child_name("edit")
@@ -185,6 +192,7 @@ class Application(Gtk.Application):
         task = self.window.task_entry.get_text()
         status_text = self.window.status_combo.get_active_text()
         priority_text = self.window.priority_combo.get_active_text()        
+        description = self.window.description_entry.get_text() if hasattr(self.window, 'description_entry') else ""
         if not task:
             error_dialog(self.window, "! Tasks needs a summary !")
             return
@@ -197,6 +205,10 @@ class Application(Gtk.Application):
         self.todo['summary'] = task
         self.todo['priority'] = priority
         self.todo['status'] = status
+        if description:
+            self.todo['description'] = description
+        elif 'description' in self.todo:
+            del self.todo['description']
         # Handle no due 
         if hasattr(self.window.due_button, 'selected_date'):
             new_task_due = self.window.due_button.selected_date
@@ -593,6 +605,7 @@ ROOT_DIR="{root_dir}"
             try:
                 uid = str(component.get('uid', ''))
                 task = str(component.get('summary', 'Untitled Task'))
+                description = str(component.get('description', ''))
                 priority_val = int(component.get('priority', '9999'))
                 priority = priority_map.get(priority_val, 'Not Set')
                 status_val = str(component.get('status', 'None'))
@@ -618,7 +631,7 @@ ROOT_DIR="{root_dir}"
 
                 related_to = str(component.get('related-to', ''))
 
-                task_info = (uid, task, priority, status, due_str, due_date, related_to)
+                task_info = (uid, task, description, priority, status, due_str, due_date, related_to)
                 tasks_by_uid[uid] = task_info
 
                 if related_to:
@@ -629,16 +642,21 @@ ROOT_DIR="{root_dir}"
             except Exception as e:
                 print(f"Error parsing task: {e}")
 
+        # Collapse all parents on first load
+        if self.first_load:
+            self.collapsed_parents = set(parent_to_children.keys())
+            self.first_load = False
+
         # Recursive insertion
         def insert_task(uid, level):
             if uid not in tasks_by_uid:
                 return
 
-            task, name, priority, status, due_str, due_date, _ = tasks_by_uid[uid]
+            task, name, description, priority, status, due_str, due_date, _ = tasks_by_uid[uid]
             indent = "  " * level + ("󰳟   " if level > 0 else "")
             is_parent = uid in parent_to_children
             is_collapsed = uid in self.collapsed_parents
-            task_obj = TaskObject(uid=task, task=f"{indent}{name}", priority=priority, status=status, due=due_str)
+            task_obj = TaskObject(uid=task, task=f"{indent}{name}", description=description, priority=priority, status=status, due=due_str)
             task_obj.is_parent = is_parent
             task_obj.is_collapsed = is_collapsed
             self.task_list.append(task_obj)
@@ -647,12 +665,12 @@ ROOT_DIR="{root_dir}"
                 return  # Don't show children if collapsed
 
             children = parent_to_children.get(uid, [])
-            children.sort(key=lambda cid: (tasks_by_uid[cid][5], -priority_sort_order[tasks_by_uid[cid][2]]))
+            children.sort(key=lambda cid: (tasks_by_uid[cid][6], -priority_sort_order[tasks_by_uid[cid][3]]))
             for child_uid in children:
                 insert_task(child_uid, level + 1)
 
         # Sort roots and begin recursion
-        roots.sort(key=lambda uid: (tasks_by_uid[uid][5], -priority_sort_order[tasks_by_uid[uid][2]]))
+        roots.sort(key=lambda uid: (tasks_by_uid[uid][6], -priority_sort_order[tasks_by_uid[uid][3]]))
         for root_uid in roots:
             insert_task(root_uid, 0)
 

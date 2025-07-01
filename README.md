@@ -41,6 +41,8 @@ sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar p
       - [x] Edit task <br />
       - [x] Due hour manage 
  - [x] First use setup (WIP)<br />
+ - [x] Description management
+ - [x] Collapsable parent tasks 
  - [ ] Manage more then one calendar <br />
  - [ ] Graphical refinement<br />
    - [ ] Toggle for excluding completed tasks (now ever on)
