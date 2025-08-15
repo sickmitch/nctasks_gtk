@@ -40,7 +40,6 @@ class Window(Gtk.ApplicationWindow):
         from .dialogs import on_due_date_clicked
         input_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10, hexpand=True, vexpand=False, halign=Gtk.Align.FILL, valign=Gtk.Align.FILL)
         self.grid.attach(input_box, 0, 0, 5, 1)
-        # Vertical box for summary and description (expand as much as possible)
         entry_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True, vexpand=True, halign=Gtk.Align.FILL, valign=Gtk.Align.FILL)
         self.task_entry = Gtk.Entry(
             placeholder_text="Task summary",
@@ -61,16 +60,16 @@ class Window(Gtk.ApplicationWindow):
         )
         entry_vbox.append(self.description_entry)
         input_box.append(entry_vbox)
-        # Priority and Status stacked vertically (do not expand)
-        prio_status_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=False, vexpand=True, halign=Gtk.Align.END, valign=Gtk.Align.FILL)
-        self.priority_combo = Gtk.ComboBoxText(hexpand=False, halign=Gtk.Align.FILL)
+        prio_status_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=False, vexpand=True, halign=Gtk.Align.END, valign=Gtk.Align.CENTER)
+        self.priority_combo = Gtk.ComboBoxText(hexpand=False, halign=Gtk.Align.FILL, valign=Gtk.Align.CENTER)
         for priority in ["Priority", "Low", "Medium", "High"]:
             self.priority_combo.append_text(priority)
         self.priority_combo.set_active(0)
         priority_renderer = self.priority_combo.get_cells()[0]
         priority_renderer.set_property("xalign", 0.5)
+        priority_renderer.set_property("xpad", 10)  # Add horizontal padding
         prio_status_vbox.append(self.priority_combo)
-        self.status_combo = Gtk.ComboBoxText(hexpand=False, halign=Gtk.Align.FILL)
+        self.status_combo = Gtk.ComboBoxText(hexpand=False, halign=Gtk.Align.FILL, valign=Gtk.Align.CENTER)
         for status in ["Status", "Todo", "Started"]:
             self.status_combo.append_text(status)
         self.status_combo.set_active(0)
@@ -79,9 +78,9 @@ class Window(Gtk.ApplicationWindow):
         prio_status_vbox.append(self.status_combo)
         input_box.append(prio_status_vbox)
         # Due and Add button stacked vertically (make as compact as possible)
-        due_add_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=False, vexpand=True, halign=Gtk.Align.END, valign=Gtk.Align.FILL)
-        self.due_button = Gtk.Button()
-        self.due_button.set_size_request(40, -1)  # Smaller width
+        due_add_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=False, vexpand=True, halign=Gtk.Align.END, valign=Gtk.Align.CENTER)
+        self.due_button = Gtk.Button(valign=Gtk.Align.CENTER)
+        self.due_button.set_size_request(40, -1)
         self.due_stack = Gtk.Stack()
         self.due_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         icon = Gtk.Image.new_from_icon_name("org.gnome.Calendar")
@@ -92,8 +91,8 @@ class Window(Gtk.ApplicationWindow):
         self.due_button.set_child(self.due_stack)
         self.due_button.connect("clicked", on_due_date_clicked, self.due_button, self.due_stack, self.date_label)
         due_add_vbox.append(self.due_button)
-        self.add_button = Gtk.Button()
-        self.add_button.set_size_request(40, -1)  # Smaller width
+        self.add_button = Gtk.Button(valign=Gtk.Align.CENTER)
+        self.add_button.set_size_request(40, -1)
         self.add_stack = Gtk.Stack()
         self.add_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         add = Gtk.Image.new_from_icon_name("list-add-symbolic")
