@@ -77,7 +77,7 @@
         border: 2px solid #2c9fb5;
         font-weight: 350;
         border-radius: calc(var(--border-radius) + 4px);
-        font-family: 'JetBrains Mono', monospace;
+        font-family: 'JetBrains Mono', monospacedding: 4px 12px;
     }
 
     calendar {
@@ -98,4 +98,11 @@
 
     .collapsed-parent {
         text-decoration: underline;
+    }
+
+    /* Dialog button styling */
+    .dialog-action-area button {
+        margin-bottom: 12px;
+        margin-left: 6px;
+        margin-right: 6px;
     }

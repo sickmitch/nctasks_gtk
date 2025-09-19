@@ -38,49 +38,42 @@ class Window(Gtk.ApplicationWindow):
     ### GENERATE UI UP TO DOWN 
     def create_input_fields(self):
         from .dialogs import on_due_date_clicked
-        input_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10, hexpand=True, vexpand=False, halign=Gtk.Align.FILL, valign=Gtk.Align.FILL)
-        self.grid.attach(input_box, 0, 0, 5, 1)
-        entry_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True, vexpand=True, halign=Gtk.Align.FILL, valign=Gtk.Align.FILL)
+        
+        # Component height constant
+        COMPONENT_HEIGHT = 32
+        
+        # Main container for all input fields
+        main_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=True, vexpand=False)
+        self.grid.attach(main_container, 0, 0, 5, 1)
+        
+        # Top row: Task summary, Priority, Due date
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, hexpand=True, vexpand=False, valign=Gtk.Align.CENTER)
+        
+        # Task summary entry
         self.task_entry = Gtk.Entry(
             placeholder_text="Task summary",
             hexpand=True,
             halign=Gtk.Align.FILL,
-            xalign=0.5,
-            vexpand=True,
-            valign=Gtk.Align.FILL
+            valign=Gtk.Align.CENTER,
+            xalign=0.5
         )
-        entry_vbox.append(self.task_entry)
-        self.description_entry = Gtk.Entry(
-            placeholder_text="Task description (optional)",
-            hexpand=True,
-            halign=Gtk.Align.FILL,
-            xalign=0.5,
-            vexpand=True,
-            valign=Gtk.Align.FILL
-        )
-        entry_vbox.append(self.description_entry)
-        input_box.append(entry_vbox)
-        prio_status_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=False, vexpand=True, halign=Gtk.Align.END, valign=Gtk.Align.CENTER)
+        self.task_entry.set_size_request(-1, COMPONENT_HEIGHT)  # Consistent height
+        top_row.append(self.task_entry)
+        
+        # Priority combobox
         self.priority_combo = Gtk.ComboBoxText(hexpand=False, halign=Gtk.Align.FILL, valign=Gtk.Align.CENTER)
+        self.priority_combo.set_size_request(120, COMPONENT_HEIGHT)  # Consistent height
         for priority in ["Priority", "Low", "Medium", "High"]:
             self.priority_combo.append_text(priority)
         self.priority_combo.set_active(0)
         priority_renderer = self.priority_combo.get_cells()[0]
         priority_renderer.set_property("xalign", 0.5)
-        priority_renderer.set_property("xpad", 10)  # Add horizontal padding
-        prio_status_vbox.append(self.priority_combo)
-        self.status_combo = Gtk.ComboBoxText(hexpand=False, halign=Gtk.Align.FILL, valign=Gtk.Align.CENTER)
-        for status in ["Status", "Todo", "Started"]:
-            self.status_combo.append_text(status)
-        self.status_combo.set_active(0)
-        status_renderer = self.status_combo.get_cells()[0]
-        status_renderer.set_property("xalign", 0.5)
-        prio_status_vbox.append(self.status_combo)
-        input_box.append(prio_status_vbox)
-        # Due and Add button stacked vertically (make as compact as possible)
-        due_add_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, hexpand=False, vexpand=True, halign=Gtk.Align.END, valign=Gtk.Align.CENTER)
+        top_row.append(self.priority_combo)
+        
+        # Due date button
         self.due_button = Gtk.Button(valign=Gtk.Align.CENTER)
-        self.due_button.set_size_request(40, -1)
+        self.due_button.get_style_context().add_class("icon-button")
+        self.due_button.set_size_request(40, COMPONENT_HEIGHT)  # Consistent height
         self.due_stack = Gtk.Stack()
         self.due_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         icon = Gtk.Image.new_from_icon_name("org.gnome.Calendar")
@@ -90,9 +83,38 @@ class Window(Gtk.ApplicationWindow):
         self.due_stack.set_visible_child_name("icon")
         self.due_button.set_child(self.due_stack)
         self.due_button.connect("clicked", on_due_date_clicked, self.due_button, self.due_stack, self.date_label)
-        due_add_vbox.append(self.due_button)
+        top_row.append(self.due_button)
+        
+        main_container.append(top_row)
+        
+        # Bottom row: Task description, Status, Add button
+        bottom_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, hexpand=True, vexpand=False, valign=Gtk.Align.CENTER)
+        
+        # Task description entry
+        self.description_entry = Gtk.Entry(
+            placeholder_text="Task description (optional)",
+            hexpand=True,
+            halign=Gtk.Align.FILL,
+            valign=Gtk.Align.CENTER,
+            xalign=0.5
+        )
+        self.description_entry.set_size_request(-1, COMPONENT_HEIGHT)  # Consistent height
+        bottom_row.append(self.description_entry)
+        
+        # Status combobox
+        self.status_combo = Gtk.ComboBoxText(hexpand=False, halign=Gtk.Align.FILL, valign=Gtk.Align.CENTER)
+        self.status_combo.set_size_request(120, COMPONENT_HEIGHT)  # Consistent height
+        for status in ["Status", "Todo", "Started"]:
+            self.status_combo.append_text(status)
+        self.status_combo.set_active(0)
+        status_renderer = self.status_combo.get_cells()[0]
+        status_renderer.set_property("xalign", 0.5)
+        bottom_row.append(self.status_combo)
+        
+        # Add button
         self.add_button = Gtk.Button(valign=Gtk.Align.CENTER)
-        self.add_button.set_size_request(40, -1)
+        self.add_button.get_style_context().add_class("icon-button")
+        self.add_button.set_size_request(40, COMPONENT_HEIGHT)  # Consistent height
         self.add_stack = Gtk.Stack()
         self.add_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
         add = Gtk.Image.new_from_icon_name("list-add-symbolic")
@@ -102,8 +124,9 @@ class Window(Gtk.ApplicationWindow):
         self.add_stack.set_visible_child_name("add")
         self.add_button.set_child(self.add_stack)
         self.add_button.connect("clicked", self.on_stack_clicked, self.add_stack)
-        due_add_vbox.append(self.add_button)
-        input_box.append(due_add_vbox)
+        bottom_row.append(self.add_button)
+        
+        main_container.append(bottom_row)
         # Connect task_entry activate to add/edit
         self.task_entry.connect("activate", self.on_stack_clicked, self.add_stack)
         self.initial_values = {
