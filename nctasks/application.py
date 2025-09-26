@@ -512,14 +512,23 @@ ROOT_DIR="{root_dir}"
             print(self.api_key)
             # TODO: New fetch for the radicale caldav server
             response = requests.request(
-                method='GET',
+                method='REPORT',
                 url=self.cal_url,
                 headers={
                     'Depth': '1',
+                    'Content-Type': 'application/xml'
                 },
                 auth=HTTPBasicAuth(self.user, self.api_key),
+                data='''<?xml version="1.0" encoding="UTF-8"?>
+                    <d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+                        <d:prop>
+                            <d:getetag/>
+                            <cal:calendar-data/>
+                        </d:prop>
+                    </d:propfind>''',
                 timeout=10 
             )
+            print(response.content)
             # #TODO: Nextcloud call here
             # response = requests.request(
             #     method='PROPFIND',
