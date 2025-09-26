@@ -477,9 +477,9 @@ class Application(Gtk.Application):
                 setup_dialog(missing,parent=self.window,refresh_callback=self.load_environment_vars)
         else:
             # TODO: This is the new url building for the radicale caldav server
-            # self.cal_url = f"{self.base_url}/{self.user}/{self.calendar}"
+            self.cal_url = f"{self.base_url}/{self.user}/{self.calendar}"
             # TODO: Nextcloud url building here
-            self.cal_url = f"{self.base_url}/remote.php/dav/calendars/{self.user}/{self.calendar}"
+            # self.cal_url = f"{self.base_url}/remote.php/dav/calendars/{self.user}/{self.calendar}"
             self.ics_file = os.path.join(self.root_dir, 'tasks')
             self.start_async_fetch()           
             
@@ -511,34 +511,33 @@ ROOT_DIR="{root_dir}"
             print(self.user)
             print(self.api_key)
             # TODO: New fetch for the radicale caldav server
-            # response = requests.request(
-            #     method='GET',
-            #     url=self.cal_url,
-            #     headers={
-            #         'Depth': '1',
-            #     },
-            #     auth=HTTPBasicAuth(self.user, self.api_key),
-            #     timeout=10 
-            # )
-            # #TODO: Nextcloud call here
-            # Send PROPFIND request to CalDAV server
             response = requests.request(
-                method='PROPFIND',
+                method='GET',
                 url=self.cal_url,
                 headers={
                     'Depth': '1',
-                    'Content-Type': 'application/xml'
                 },
                 auth=HTTPBasicAuth(self.user, self.api_key),
-                data='''<?xml version="1.0" encoding="UTF-8"?>
-                    <d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
-                        <d:prop>
-                            <d:getetag/>
-                            <cal:calendar-data/>
-                        </d:prop>
-                    </d:propfind>''',
                 timeout=10 
             )
+            # #TODO: Nextcloud call here
+            # response = requests.request(
+            #     method='PROPFIND',
+            #     url=self.cal_url,
+            #     headers={
+            #         'Depth': '1',
+            #         'Content-Type': 'application/xml'
+            #     },
+            #     auth=HTTPBasicAuth(self.user, self.api_key),
+            #     data='''<?xml version="1.0" encoding="UTF-8"?>
+            #         <d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+            #             <d:prop>
+            #                 <d:getetag/>
+            #                 <cal:calendar-data/>
+            #             </d:prop>
+            #         </d:propfind>''',
+            #     timeout=10 
+            # )
             # Check if the response is valid
             response.raise_for_status()
             # Log status and content type for debugging
