@@ -476,6 +476,9 @@ class Application(Gtk.Application):
             if self.window.get_mapped():
                 setup_dialog(missing,parent=self.window,refresh_callback=self.load_environment_vars)
         else:
+            # TODO: This is the new url building for the radicale caldav server
+            # self.cal_url = f"{self.base_url}/{self.user}/{self.calendar}"
+            # TODO: Nextcloud url building here
             self.cal_url = f"{self.base_url}/remote.php/dav/calendars/{self.user}/{self.calendar}"
             self.ics_file = os.path.join(self.root_dir, 'tasks')
             self.start_async_fetch()           
@@ -498,12 +501,26 @@ ROOT_DIR="{root_dir}"
 
     ### ASYNC FETCH
     def start_async_fetch(self):
-        self.set_ui_state(busy=True, status="Connecting to Nextcloud...")
+        self.set_ui_state(busy=True, status="Connecting to DAV server...")
         threading.Thread(target=self.fetch_caldav_data, daemon=True).start()
 
     ### FETCHING
     def fetch_caldav_data(self):
         try:
+            print(self.cal_url)
+            print(self.user)
+            print(self.api_key)
+            # TODO: New fetch for the radicale caldav server
+            # response = requests.request(
+            #     method='GET',
+            #     url=self.cal_url,
+            #     headers={
+            #         'Depth': '1',
+            #     },
+            #     auth=HTTPBasicAuth(self.user, self.api_key),
+            #     timeout=10 
+            # )
+            # #TODO: Nextcloud call here
             # Send PROPFIND request to CalDAV server
             response = requests.request(
                 method='PROPFIND',
@@ -524,9 +541,17 @@ ROOT_DIR="{root_dir}"
             )
             # Check if the response is valid
             response.raise_for_status()
-            # Ensure response contains XML/ICS data
-            if "xml" not in response.headers.get("Content-Type", ""):
-                raise ValueError("Invalid response content type. Expected XML.")
+            # Log status and content type for debugging
+            try:
+                print(f"DAV GET status: {response.status_code}")
+                print(f"DAV GET content-type: {response.headers.get('Content-Type', '')}")
+            except Exception:
+                pass
+            # Accept common content types from DAV servers
+            # e.g., 'text/calendar', 'application/xml', 'text/xml', 'application/calendar+json'
+            # Don't block on strict type; just ensure we received some content
+            if not response.content:
+                raise ValueError("Empty response body from server.")
             # Save received data
             os.makedirs(os.path.dirname(self.ics_file), exist_ok=True)
             with open(self.ics_file, 'wb') as f:
