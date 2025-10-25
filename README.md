@@ -20,7 +20,7 @@ sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar p
    - In the field at bottom of the page insert app name, not important is usefull only to later reference <br />
    - Copy the unique key shown in a dialog **it will be seen only now** <br />
    - Paste the key into NCTasks's setup dialog
-  ### Find available calendars :<br />
+  ### Find available nextcloud calendars :<br />
   $BASE_URL should be in a "https://nextcloud.example.xyz/" format
   ```
   curl -u $USER:$API_KEY -X PROPFIND "$BASE_URL/remote.php/dav/calendars/$USER/" | grep -oE "$USER/[^/]*/" | cut -c"$(wc -m<<<$USER)"- | tr -d '/' | awk 'length != 1'
@@ -40,13 +40,13 @@ sudo pacman -S python-gobject gtk4 libadwaita python-requests python-icalendar p
       - [x] Remove due <br />
       - [x] Edit task <br />
       - [x] Due hour manage 
- - [x] First use setup (WIP)<br />
+ - [x] First use setup <br />
  - [x] Description management
  - [x] Collapsable parent tasks 
  - [ ] Manage more then one calendar <br />
  - [ ] Graphical refinement<br />
    - [ ] Toggle for excluding completed tasks (now ever on)
-   - [ ] Collapse secondary tasks
+   - [x] Collapse secondary tasks
    - [ ] Add options button for setup dialog
    - [ ] Overall consistency
  - [ ] In app settings (defaults, server, ui, ...)

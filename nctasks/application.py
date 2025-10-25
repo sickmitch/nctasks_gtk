@@ -19,8 +19,8 @@ class Application(Gtk.Application):
         super().__init__(application_id="com.sickmitch.NCTasks")
         self.task_list = [] 
         self.uid = []
-        self.collapsed_parents = set()  # Track collapsed parent UIDs
-        self.first_load = True  # Track if this is the first load
+        self.collapsed_parents = set()
+        self.first_load = True
     def do_activate(self):
         from .window import Window
         self.window = Window(self)
@@ -135,6 +135,7 @@ class Application(Gtk.Application):
             except requests.exceptions.RequestException as e:
                 error_dialog(self.window, f"Failed to delete task from server: {e}")
         # Save the updated calendar and refresh the task list
+        self.reset_input()
         self.start_async_fetch()
     
     ### EDIT BUTTON HANDLER
@@ -442,7 +443,8 @@ class Application(Gtk.Application):
             del self.window.due_button.selected_date
         except AttributeError:
             pass
-        self.window.task_entry.set_text('')
+        self.window.task_entry.set_text("")
+        self.window.task_entry.set_placeholder_text("Task summary")
         self.window.status_combo.set_active(0)
         self.window.priority_combo.set_active(0)
         self.window.due_stack.set_visible_child_name("icon")
@@ -501,15 +503,13 @@ ROOT_DIR="{root_dir}"
 
     ### ASYNC FETCH
     def start_async_fetch(self):
+        self.reset_input()
         self.set_ui_state(busy=True, status="Connecting to DAV server...")
         threading.Thread(target=self.fetch_caldav_data, daemon=True).start()
 
     ### FETCHING
     def fetch_caldav_data(self):
         try:
-            print(self.cal_url)
-            print(self.user)
-            print(self.api_key)
             # TODO: New fetch for the radicale caldav server
             response = requests.request(
                 method='REPORT',
@@ -528,7 +528,6 @@ ROOT_DIR="{root_dir}"
                     </d:propfind>''',
                 timeout=10 
             )
-            print(response.content)
             # #TODO: Nextcloud call here
             # response = requests.request(
             #     method='PROPFIND',
@@ -549,12 +548,6 @@ ROOT_DIR="{root_dir}"
             # )
             # Check if the response is valid
             response.raise_for_status()
-            # Log status and content type for debugging
-            try:
-                print(f"DAV GET status: {response.status_code}")
-                print(f"DAV GET content-type: {response.headers.get('Content-Type', '')}")
-            except Exception:
-                pass
             # Accept common content types from DAV servers
             # e.g., 'text/calendar', 'application/xml', 'text/xml', 'application/calendar+json'
             # Don't block on strict type; just ensure we received some content

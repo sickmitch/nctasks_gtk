@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 
 
+### DUE DATE DIALOG
 def on_due_date_clicked(button, due_button, stack, date_label):
     # Define dialog
     dialog = Gtk.Dialog(title="Select Due Date and Time")
@@ -70,13 +71,13 @@ def setup_dialog(missing, parent, refresh_callback):
     parent.present()
     parent.grab_focus()
     # Dialog 
-    dialog = Gtk.Dialog(title="Setup NCTasks", transient_for=parent, modal=True)
+    dialog = Gtk.Dialog(title="Setup Tasks", transient_for=parent, modal=True)
     dialog.set_transient_for(parent)
     dialog.set_application(parent.get_application())
-    dialog.set_size_request(1000, 400)
+    # dialog.set_size_request(1000, 400)
     # Header 
     header_bar = Gtk.HeaderBar()
-    header_bar.set_title_widget(Gtk.Label(label="Fill to setup NCTasks"))
+    header_bar.set_title_widget(Gtk.Label(label="Fill to setup Tasks"))
     header_bar.set_show_title_buttons(False)
     dialog.set_titlebar(header_bar)
     # Buttons
@@ -97,7 +98,7 @@ def setup_dialog(missing, parent, refresh_callback):
     url_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "BASE_URL" not in missing:
         url_entry.set_text(os.getenv("BASE_URL"))
-    url_label = Gtk.Label(label="Base URL (Nextcloud landing page)")
+    url_label = Gtk.Label(label="Base URL")
     url_entry.set_size_request(250, -1)
     grid.attach(url_label, 0, 1, 1, 1)
     grid.attach(url_entry, 1, 1, 1, 1)
@@ -105,7 +106,7 @@ def setup_dialog(missing, parent, refresh_callback):
     user_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "USERNAME" not in missing:
         user_entry.set_text(os.getenv("USERNAME"))
-    user_label = Gtk.Label(label="Username used to login in Nextcloud:")
+    user_label = Gtk.Label(label="Username")
     user_entry.set_size_request(250, -1)
     grid.attach(user_label, 0, 2, 1, 1)
     grid.attach(user_entry, 1, 2, 1, 1)
@@ -113,7 +114,7 @@ def setup_dialog(missing, parent, refresh_callback):
     api_key_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "API_KEY" not in missing:
         api_key_entry.set_text(os.getenv("API_KEY"))
-    api_key_label = Gtk.Label(label="Api_key to use for authentication")
+    api_key_label = Gtk.Label(label="Password or Api_key to use for authentication")
     api_key_entry.set_size_request(250, -1)
     grid.attach(api_key_label, 0, 3, 1, 1)
     grid.attach(api_key_entry, 1, 3, 1, 1)
@@ -131,7 +132,7 @@ def setup_dialog(missing, parent, refresh_callback):
     root_dir_entry = Gtk.Entry(hexpand=True,halign=Gtk.Align.FILL,xalign=0.5)
     if "ROOT_DIR" not in missing:
         root_dir_entry.set_text(os.getenv("ROOT_DIR"))
-    root_dir_label = Gtk.Label(label="Absolute path to NCTasks code")
+    root_dir_label = Gtk.Label(label="Absolute path to Tasks code")
     root_dir_entry.set_size_request(250, -1)
     grid.attach(root_dir_label, 0, 5, 1, 1)
     grid.attach(root_dir_entry, 1, 5, 1, 1)
@@ -160,6 +161,7 @@ def setup_dialog(missing, parent, refresh_callback):
     dialog.show()
     dialog.set_visible(True)
     dialog.grab_focus()
+    
 
 #### ERROR MESSAGE
 def error_dialog(parent, message):

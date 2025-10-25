@@ -76,8 +76,11 @@ class Window(Gtk.ApplicationWindow):
         self.due_button.set_size_request(40, COMPONENT_HEIGHT)  # Consistent height
         self.due_stack = Gtk.Stack()
         self.due_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.due_stack.set_hhomogeneous(False)
+        self.due_stack.set_vhomogeneous(False)
         icon = Gtk.Image.new_from_icon_name("org.gnome.Calendar")
         self.date_label = Gtk.Label()
+        self.date_label.set_single_line_mode(True)
         self.due_stack.add_named(icon, "icon")
         self.due_stack.add_named(self.date_label, "date")
         self.due_stack.set_visible_child_name("icon")
@@ -280,7 +283,7 @@ class Window(Gtk.ApplicationWindow):
         # Helper function to create buttons with Unicode icons
         def create_button(label, icon, callback, visible=True, sensitive=True):
             icon_label = Gtk.Label(label=icon)
-            icon_label.set_margin_end(5)  # Add spacing
+            icon_label.set_margin_end(10)  # Add spacing
 
             btn = Gtk.Button.new()
             btn_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
@@ -307,15 +310,21 @@ class Window(Gtk.ApplicationWindow):
 
     ### STATUS BAR
     def create_status_bar(self):
+        from .dialogs import setup_dialog
         self.status_bar = Gtk.Statusbar()
         self.spinner = Gtk.Spinner()
         self.status_container = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL, 
             spacing=5
         )
+        self.settings_button = Gtk.Button(valign=Gtk.Align.CENTER, halign=Gtk.Align.CENTER, hexpand=False)
+        self.settings_button.get_style_context().add_class("icon-button")
+        self.settings_button.set_child(Gtk.Label(label=""))
+        self.settings_button.connect("clicked", setup_dialog, self, self.app.load_environment_vars)
         # Append widgets to the Box
         self.status_container.append(self.spinner)
         self.status_container.append(self.status_bar)
+        self.status_container.append(self.settings_button)
         # Configure expand properties
         self.spinner.set_hexpand(False)
         self.status_bar.set_hexpand(True)
